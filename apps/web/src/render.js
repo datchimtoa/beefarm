@@ -30,7 +30,11 @@ export function applyTranslations() {
   for (const el of document.querySelectorAll('[data-key]')) {
     const key = el.getAttribute('data-key');
     const value = t(key);
-    if (value !== key) el.textContent = value;
+    // Keys with {placeholders} (e.g. preparing) are owned by the code that
+    // supplies the value. Writing the raw template here is what produced the
+    // literal "Preparing farm... {progress}%" on screen.
+    if (value === key || value.includes('{')) continue;
+    el.textContent = value;
   }
   for (const el of document.querySelectorAll('input[data-key]')) {
     const key = el.getAttribute('data-key');
@@ -39,17 +43,74 @@ export function applyTranslations() {
   }
 }
 
-export function hideLoader() {
-  const loader = $('initial-loader');
-  const content = $('app-content');
+/** Swap the loader for the app shell. */
+function completeLoaderHide() {
+  const loader = document.getElementById('initial-loader');
+  const content = document.getElementById('app-content');
   if (!loader || !content) return;
   loader.style.opacity = '0';
   setTimeout(() => {
     loader.style.display = 'none';
     content.style.display = 'flex';
-    requestAnimationFrame(() => (content.style.opacity = '1'));
+    requestAnimationFrame(() => {
+      content.style.opacity = '1';
+    });
   }, 300);
 }
+
+/** Hide the loader immediately (used on fatal errors). */
+export function hideLoader() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+  completeLoaderHide();
+}
+
+/**
+ * Animated loading progress, mirroring the original's loop.
+ *
+ * The original crept towards 90% with `p += rnd(10)+2` every 120ms and only
+ * jumped to 100% once the player record had loaded (`else if (M)`). Without
+ * this the bar sat at 0% and the text rendered the raw template
+ * "Preparing farm... {progress}%", because applyTranslations() does not pass
+ * placeholder values.
+ */
+let progressTimer = null;
+let progressValue = 0;
+
+function paintProgress(value) {
+  const bar = document.getElementById('loading-bar');
+  const text = document.getElementById('loading-text');
+  if (bar) bar.style.width = `${value}%`;
+  if (text) text.textContent = t('preparing', { progress: Math.floor(value) });
+}
+
+/** Begin the fake progress ramp; safe to call once. */
+export function startLoader() {
+  if (progressTimer) return;
+  progressValue = 0;
+  paintProgress(0);
+
+  progressTimer = setInterval(() => {
+    if (progressValue < 90) {
+      progressValue = Math.min(90, progressValue + Math.floor(Math.random() * 10) + 2);
+      paintProgress(progressValue);
+    }
+  }, 120);
+}
+
+/** Jump to 100%, then reveal the app. Matches the original's finish sequence. */
+export function finishLoader() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+  progressValue = 100;
+  paintProgress(100);
+  setTimeout(completeLoaderHide, 400);
+}
+
 
 /** Paint everything that depends on player state. */
 export function renderState(state, now = Date.now()) {

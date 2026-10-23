@@ -4,12 +4,14 @@
 //  1. no direct database access; everything goes through /api
 //  2. no silent failures: every error path shows a visible message
 //  3. no frozen promises: a 401 shows an error instead of hanging forever
-import { initTelegram, showFatal, hideFatal } from './telegram.js';
+import { initTelegram, showFatal, hideFatal, markReady } from './telegram.js';
 import { api, ApiError } from './api.js';
 import { createStore, formatNumber, toGram } from './state.js';
 import {
   toast,
   hideLoader,
+  startLoader,
+  finishLoader,
   renderState,
   renderTasks,
   renderHistory,
@@ -40,6 +42,7 @@ if (!boot.ok) {
   showFatal(boot.message);
 } else {
   // No top-level await: the bundle targets es2020 for older Telegram webviews.
+  startLoader();
   loadLocale(boot.locale ?? 'en')
     .catch(() => 'en')
     .then(() => start(boot));
@@ -67,8 +70,9 @@ function start({ webApp, user }) {
       store.set(me);
       renderTasks(TASKS, me.completedTasks);
       renderHistory(me.withdrawHistory, me.rateTon);
-      hideLoader();
+      finishLoader();
       hideFatal();
+      markReady(webApp);
     } catch (err) {
       hideLoader();
       handleError(err);

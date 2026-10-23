@@ -27,8 +27,27 @@ function buildStore() {
     try {
       serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     } catch {
-      console.error('[vercel] FIREBASE_SERVICE_ACCOUNT is not valid JSON');
+      // A malformed key used to fall through to application-default credentials,
+      // which then retried OAuth forever and surfaced as a 500 timeout.
+      throw new Error(
+        '[vercel] FIREBASE_SERVICE_ACCOUNT is not valid JSON. Paste the whole ' +
+          'service-account file as one line (see docs/DEPLOY-VERCEL.md).'
+      );
     }
+    if (!serviceAccount.client_email || !serviceAccount.private_key) {
+      throw new Error(
+        '[vercel] FIREBASE_SERVICE_ACCOUNT is missing client_email/private_key. ' +
+          'Download the key from Firebase console > Project settings > Service accounts.'
+      );
+    }
+  } else {
+    // No key at all: applicationDefault() cannot work on Vercel (no metadata
+    // server for this project, no local credentials file). Fail fast and say so
+    // rather than hanging on repeated OAuth attempts.
+    throw new Error(
+      '[vercel] FIREBASE_SERVICE_ACCOUNT is not set. The API cannot reach Firebase; ' +
+        'see docs/DEPLOY-VERCEL.md.'
+    );
   }
   return new FirebaseStore({ databaseUrl: url, serviceAccount });
 }
@@ -57,6 +76,23 @@ function getApp() {
   return app;
 }
 
-export default function handler(req, res) {
-  return getApp()(req, res);
+export default async function handler(req, res) {
+  let app;
+  try {
+    app = getApp();
+  } catch (err) {
+    // Misconfiguration must be readable from the player's screen and the logs.
+    // Returning a bare 500 gives only FUNCTION_INVOCATION_FAILED, which hides
+    // the real cause (missing FIREBASE_SERVICE_ACCOUNT, malformed key, ...).
+    console.error('[vercel] startup failed:', err.message);
+    const body = JSON.stringify({
+      success: false,
+      errorCode: 'system_error',
+      reason: err.message,
+    });
+    res.writeHead(500, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(body);
+    return;
+  }
+  return app(req, res);
 }

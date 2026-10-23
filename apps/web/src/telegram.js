@@ -15,7 +15,10 @@ export function initTelegram() {
     };
   }
 
-  tg.ready?.();
+  // NOTE: ready() is deliberately NOT called here. The original called it during
+  // init, which tells Telegram the app is ready to display; combined with our
+  // loader still sitting at 0% it leaves Telegram's own overlay spinning.
+  // main.js calls markReady() once the loader has finished instead.
   tg.expand?.();
   tg.disableVerticalSwipes?.();
   tg.enableClosingConfirmation?.();
@@ -52,4 +55,13 @@ export function showFatal(message) {
 export function hideFatal() {
   const el = document.getElementById('fatal-error');
   if (el) el.style.display = 'none';
+}
+
+/** Tell Telegram the app is actually ready to be shown. */
+export function markReady(webApp) {
+  try {
+    webApp?.ready?.();
+  } catch {
+    /* ready() is best-effort */
+  }
 }

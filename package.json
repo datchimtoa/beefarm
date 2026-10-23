@@ -1,0 +1,13 @@
+{
+  "name": "beefarm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Serverless entrypoint package. Vercel installs dependencies for the function from this file.",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}
