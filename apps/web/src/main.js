@@ -18,6 +18,7 @@ import {
   applyTranslations,
 } from './render.js';
 import { loadLocale, t, locale } from './i18n.js';
+import { showRewardedAd } from './ads.js';
 
 const TASKS = [
   { id: 't1', channel: 'Lucky Sheep Farm Channel', reward: 5_000, type: 'channel' },
@@ -165,20 +166,26 @@ function start({ webApp, user }) {
    * the shift when the provider's postback arrives, so skipping it locally
    * gains nothing.
    */
+  /**
+   * Show the rewarded interstitial.
+   *
+   * A resolved Promise is NOT permission to reward: Monetag confirms whether the
+   * impression was monetised via the server postback, which is what actually
+   * grants the shift. This only drives the UI.
+   */
   async function playAd(token) {
-    const zone = import.meta.env?.VITE_AD_ZONE ?? '11373165';
-    const show = globalThis[`show_${zone}`];
-    if (typeof show !== 'function') {
-      toast(t('toast_no_ads'), 'error');
+    const result = await showRewardedAd({
+      telegramId: user.id,
+      token,
+      requestVar: 'start-shift',
+    });
+    if (!result.shown) {
+      // 'no_zone' means ads are not configured for this build; say so plainly
+      // rather than blaming the network.
+      toast(result.reason === 'no_zone' ? t('toast_no_ads') : t('toast_no_ads'), 'error');
       return false;
     }
-    try {
-      await show({ ymid: String(user.id), requestVar: 'start-shift', token });
-      return true;
-    } catch {
-      toast(t('toast_no_ads'), 'error');
-      return false;
-    }
+    return true;
   }
 
   function bindTasks() {

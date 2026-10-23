@@ -84,8 +84,33 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
     // Ad provider server-to-server postback. Deliberately NOT behind
     // verifyInitData: the caller is the ad network, authenticated by an HMAC
     // over (token, user_id) using the shared secret instead.
-    if (req.method === 'POST' && route === '/api/ads/postback') {
-      if (!ads) return json(res, 503, { success: false, errorCode: ERR.SYSTEM, reason: 'no_ads' });
+    // Monetag posts back as a GET with macros substituted in the query string.
+    // It retries for ~38h, so a non-2xx here means repeated deliveries.
+    if (route === '/api/ads/postback' && ads) {
+      const params = Object.fromEntries(url.searchParams.entries());
+
+      // Monetag's macros arrive as query params; our own test harness posts JSON.
+      const isMonetag = 'ymid' in params && 'reward_event_type' in params;
+      if (isMonetag) {
+        const result = ads.handleMonetagPostback(params);
+        if (!result.ok) {
+          // A non_valued impression is expected and not a failure worth 500ing:
+          // answer 200 so Monetag stops retrying, but grant nothing.
+          const benign = ['not_valued', 'already_redeemed', 'already_spent', 'unknown_or_expired'];
+          console.warn('[ads] monetag postback', { reason: result.reason });
+          return json(res, benign.includes(result.reason) ? 200 : 400, {
+            success: false,
+            reason: result.reason,
+          });
+        }
+        console.info('[ads] monetag reward confirmed', {
+          userId: result.userId,
+          price: result.price,
+          requestVar: result.requestVar,
+        });
+        return json(res, 200, { success: true });
+      }
+
       const body = await readBody(req);
       const result = ads.handlePostback(body);
       if (!result.ok) {

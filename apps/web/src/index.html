@@ -18,7 +18,11 @@
     <script src="/assets/vendor/tailwind-3.4.17.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src='//libtl.com/sdk.js' data-zone='11373165' data-sdk='show_11373165'></script>
+    <!-- Monetag TMA SDK. data-sdk creates window.show_<zone>.
+         The zone id comes from your Monetag publisher account and must match
+         VITE_AD_ZONE, which apps/web/src/ads.js uses to find the function.
+         Left as a placeholder so a build without a zone shows no ads. -->
+    <script src="https://libtl.com/sdk.js" data-zone="__AD_ZONE__" data-sdk="__AD_SDK__"></script>
   <script type="module" src="/main.js"></script>
 
   <link rel="stylesheet" crossorigin href="/assets/index.css">

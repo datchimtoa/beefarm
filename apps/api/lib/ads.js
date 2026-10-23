@@ -89,6 +89,65 @@ export class AdVerifier {
    * @param {{token?: string, user_id?: string, signature?: string}} body
    * @returns {{ok: boolean, reason?: string, userId?: string}}
    */
+  /**
+   * Handle a Monetag server-to-server postback.
+   *
+   * Monetag sends a GET with macros substituted, e.g.
+   *   GET /api/ads/postback?secret=...&ymid=42.<token>&event_type=impression
+   *       &reward_event_type=valued&estimated_price=0.0037&zone_id=...&telegram_id=...
+   *
+   * Differences from the generic handler above, both per Monetag's docs:
+   *  - the secret travels in the URL (Monetag stores the URL; the app never
+   *    sees it), not as an HMAC header
+   *  - the reward token is embedded in `ymid` as "<telegramId>.<token>"
+   *  - only `reward_event_type === 'valued'` may grant a shift
+   *  - the same postback can be retried for ~38h, so this must be idempotent
+   *
+   * @param {Record<string,string>} query
+   */
+  handleMonetagPostback(query = {}) {
+    const provided = String(query.secret ?? '');
+    const a = Buffer.from(String(this.secret), 'utf8');
+    const b = Buffer.from(provided, 'utf8');
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      this.onForgery?.({ reason: 'bad_secret' });
+      return { ok: false, reason: 'bad_secret' };
+    }
+
+    const ymid = String(query.ymid ?? '');
+    if (!ymid) return { ok: false, reason: 'missing_ymid' };
+
+    // ymid is "<telegramId>.<token>"; the token is what we issued for the shift.
+    const dot = ymid.indexOf('.');
+    const telegramId = dot === -1 ? ymid : ymid.slice(0, dot);
+    const tokenId = dot === -1 ? '' : ymid.slice(dot + 1);
+
+    if (String(query.reward_event_type ?? '') !== 'valued') {
+      // Recorded but not rewarded: non_valued still counts as a delivered ad.
+      return { ok: false, reason: 'not_valued', telegramId, tokenId };
+    }
+
+    if (this.spent.has(tokenId)) return { ok: false, reason: 'already_spent' };
+    if (this.consumed.has(tokenId)) return { ok: false, reason: 'already_redeemed' };
+    if (!this.isTokenLive(telegramId, tokenId)) {
+      return { ok: false, reason: 'unknown_or_expired', telegramId, tokenId };
+    }
+    if (!this.redeem(telegramId, tokenId)) {
+      return { ok: false, reason: 'unknown_or_expired', telegramId, tokenId };
+    }
+
+    // Monetag's own retry behaviour means duplicate deliveries are normal; the
+    // consumed/spent sets make this a no-op on the second attempt.
+    return {
+      ok: true,
+      userId: telegramId,
+      tokenId,
+      price: Number(query.estimated_price ?? 0) || 0,
+      zoneId: query.zone_id,
+      requestVar: query.request_var,
+    };
+  }
+
   handlePostback(body = {}) {
     const tokenId = String(body.token ?? body.token_id ?? '');
     const userId = String(body.user_id ?? body.ymid ?? '');
