@@ -1,6 +1,7 @@
 // DOM rendering. Pure functions of state -> DOM, so every screen is a
 // consequence of the store rather than scattered mutations.
 import { formatNumber, toGram } from './state.js';
+import { t } from './i18n.js';
 import { formatCountdown, isWithdrawLocked, nextSettlement } from './clock.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,6 +17,26 @@ export function toast(message, kind = 'success') {
   el.classList.remove('show');
   void el.offsetWidth; // restart the CSS transition
   el.classList.add('show');
+}
+
+/**
+ * Translate every element carrying a data-key attribute.
+ *
+ * The original did this in X() at runtime, which is why index.html ships English
+ * text that is immediately replaced. Placeholders here are only the static ones
+ * (drop-in text); dynamic values are set by renderState().
+ */
+export function applyTranslations() {
+  for (const el of document.querySelectorAll('[data-key]')) {
+    const key = el.getAttribute('data-key');
+    const value = t(key);
+    if (value !== key) el.textContent = value;
+  }
+  for (const el of document.querySelectorAll('input[data-key]')) {
+    const key = el.getAttribute('data-key');
+    const value = t(key);
+    if (value !== key) el.placeholder = value;
+  }
 }
 
 export function hideLoader() {
@@ -60,23 +81,23 @@ function renderMainAction(state, now) {
   const ready = hasShift && now >= state.workEndTime;
 
   if (!hasShift) {
-    if (bigTimer) bigTimer.textContent = 'WAITING FOR SHEARING';
-    if (txt) txt.textContent = 'SHEAR';
-    if (desc) desc.textContent = 'Watch a short ad to start a shift';
+    if (bigTimer) bigTimer.textContent = t('status_waiting');
+    if (txt) txt.textContent = t('btn_shear');
+    if (desc) desc.textContent = t('shift_duration');
     if (icon) icon.setAttribute('data-lucide', 'scissors');
     btn.disabled = false;
     btn.dataset.phase = 'start';
   } else if (ready) {
-    if (bigTimer) bigTimer.textContent = 'READY!';
-    if (txt) txt.textContent = 'HARVEST';
-    if (desc) desc.textContent = `+${formatNumber(state.pendingWool)} Wool`;
+    if (bigTimer) bigTimer.textContent = t('status_ready');
+    if (txt) txt.textContent = t('harvest_btn');
+    if (desc) desc.textContent = t('task_reward_wool', { amount: formatNumber(state.pendingWool) });
     if (icon) icon.setAttribute('data-lucide', 'package-open');
     btn.disabled = false;
     btn.dataset.phase = 'harvest';
   } else {
     if (bigTimer) bigTimer.textContent = formatCountdown(state.workEndTime - now);
-    if (txt) txt.textContent = 'SHEARING...';
-    if (desc) desc.textContent = 'Wait until the shift ends';
+    if (txt) txt.textContent = t('status_working');
+    if (desc) desc.textContent = t('status_working_desc');
     if (icon) icon.setAttribute('data-lucide', 'timer');
     btn.disabled = true;
     btn.dataset.phase = 'working';

@@ -7,7 +7,15 @@
 import { initTelegram, showFatal, hideFatal } from './telegram.js';
 import { api, ApiError } from './api.js';
 import { createStore, formatNumber, toGram } from './state.js';
-import { toast, hideLoader, renderState, renderTasks, renderHistory } from './render.js';
+import {
+  toast,
+  hideLoader,
+  renderState,
+  renderTasks,
+  renderHistory,
+  applyTranslations,
+} from './render.js';
+import { loadLocale, t, locale } from './i18n.js';
 
 const TASKS = [
   { id: 't1', channel: 'Lucky Sheep Farm Channel', reward: 5_000, type: 'channel' },
@@ -16,34 +24,25 @@ const TASKS = [
   { id: 't4', channel: 'Bee Farm Chat', reward: 5_000, type: 'chat' },
 ];
 
-// Messages for the server's error codes. Unknown codes fall back to the code
-// itself so nothing is ever silently swallowed.
-const ERRORS = {
-  unauthorized: 'Session expired. Please reopen the game from Telegram.',
-  ad_required: 'Ad not completed — please try again.',
-  not_ready: 'The shift is still running.',
-  already_claimed: 'You already claimed this task.',
-  not_member: 'Join the channel first, then claim.',
-  invalid_wallet: 'That does not look like a TON wallet address.',
-  invalid_amount: 'Enter a valid amount.',
-  insufficient_wool: 'Not enough wool.',
-  min_withdraw_error: 'Below the minimum withdrawal.',
-  daily_limit_reached: 'You already sold wool in this window. Come back after the next payout.',
-  banned: 'This account is restricted.',
-  system_error: 'Server error. Please try again shortly.',
-};
-
-const message = (code) => ERRORS[code] ?? `Something went wrong (${code}).`;
+// Server error codes map onto the original's own api_* strings, so the copy a
+// player sees matches the reference exactly. An unknown code still surfaces the
+// code itself rather than hiding the failure.
+const message = (code) =>
+  t(`api_${code}`) === `api_${code}` ? `Something went wrong (${code}).` : t(`api_${code}`);
 
 const store = createStore();
 const el = (id) => document.getElementById(id);
 
+// Load the player's language first: every rendered string comes from it.
 const boot = initTelegram();
 if (!boot.ok) {
   hideLoader();
   showFatal(boot.message);
 } else {
-  start(boot);
+  // No top-level await: the bundle targets es2020 for older Telegram webviews.
+  loadLocale(boot.locale ?? 'en')
+    .catch(() => 'en')
+    .then(() => start(boot));
 }
 
 function start({ webApp, user }) {
@@ -54,6 +53,7 @@ function start({ webApp, user }) {
   bindReferral();
   bindSettings();
 
+  applyTranslations();
   store.subscribe((state) => renderState(state));
   renderTasks(TASKS, []);
 
@@ -137,8 +137,9 @@ function start({ webApp, user }) {
         if (phase === 'harvest') {
           const res = await api.harvest();
           store.set({ wool: res.wool, pendingWool: 0, workEndTime: 0 });
-          toast(`+${formatNumber(res.credited)} Wool`);
-          if (res.referral) toast(`Your referrer earned ${formatNumber(res.referral.bonus)}`);
+          toast(t('toast_collect_success', { amount: formatNumber(res.credited) }));
+          if (res.referral)
+            toast(t('toast_ref_earned', { amount: formatNumber(res.referral.bonus) }));
           return;
         }
 
@@ -150,7 +151,7 @@ function start({ webApp, user }) {
           res = await api.harvest(res.token);
         }
         store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime });
-        toast('Shift started');
+        toast(t('toast_ad_waiting'));
       })
     );
   }
@@ -164,14 +165,14 @@ function start({ webApp, user }) {
     const zone = import.meta.env?.VITE_AD_ZONE ?? '11373165';
     const show = globalThis[`show_${zone}`];
     if (typeof show !== 'function') {
-      toast('Ads are unavailable right now. Please try again later.', 'error');
+      toast(t('toast_no_ads'), 'error');
       return false;
     }
     try {
       await show({ ymid: String(user.id), requestVar: 'start-shift', token });
       return true;
     } catch {
-      toast('Ad was not completed.', 'error');
+      toast(t('toast_no_ads'), 'error');
       return false;
     }
   }
@@ -186,7 +187,7 @@ function start({ webApp, user }) {
         const state = store.get();
         store.set({ wool: res.wool, completedTasks: [...state.completedTasks, taskId] });
         renderTasks(TASKS, store.get().completedTasks);
-        toast('Task reward claimed');
+        toast(t('toast_reward_claimed'));
       } catch (err) {
         handleError(err);
       }
@@ -224,7 +225,7 @@ function start({ webApp, user }) {
           withdrawHistory: [...state.withdrawHistory, res.withdrawal],
         });
         renderHistory(store.get().withdrawHistory, state.rateTon);
-        toast('Wool sold. The truck pays out at the next settlement.');
+        toast(t('toast_withdraw_success'));
       })
     );
   }
@@ -238,9 +239,9 @@ function start({ webApp, user }) {
     el('btn-copy-ref-icon')?.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(link);
-        toast('Invite link copied');
+        toast(t('toast_copy_link'));
       } catch {
-        toast('Could not copy. Long-press the link instead.', 'error');
+        toast(t('toast_copy_error', { error: t('toast_copy_link') }), 'error');
       }
     });
 
