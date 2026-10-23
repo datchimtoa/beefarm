@@ -1,15 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm --prefix server install --omit=dev && npm --prefix client install && npm --prefix client run build",
-  "outputDirectory": "client/dist",
+  "buildCommand": "npm --prefix apps/api install --omit=dev && npm --prefix apps/web install && npm --prefix apps/web run build",
+  "outputDirectory": "apps/web/dist",
   "functions": {
-    "api/index.js": {
+    "apps/api/handler/vercel.js": {
       "memory": 512,
       "maxDuration": 10
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    { "source": "/api/(.*)", "destination": "/apps/api/handler/vercel" }
   ],
   "headers": [
     {

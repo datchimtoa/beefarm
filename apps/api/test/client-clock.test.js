@@ -6,7 +6,7 @@ import {
   isWithdrawLocked,
   formatCountdown,
   formatDuration,
-} from '../../client/src/clock.js';
+} from '../../web/src/clock.js';
 
 const HOUR = 3_600_000;
 const at = (iso) => Date.parse(iso);
