@@ -1,0 +1,14 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      ".read": false,
+      ".write": false
+    },
+    "system_config": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}
