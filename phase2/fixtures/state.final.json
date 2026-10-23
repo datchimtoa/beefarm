@@ -1,0 +1,11 @@
+{
+  "wool": 0,
+  "pendingWool": 0,
+  "workEndTime": 0,
+  "completedTasks": [],
+  "withdrawHistory": [],
+  "lastWithdrawTime": 0,
+  "referrals": 0,
+  "refEarnedWool": 0,
+  "tonWallet": ""
+}

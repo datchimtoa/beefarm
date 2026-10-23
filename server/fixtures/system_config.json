@@ -1,0 +1,11 @@
+{
+  "system_config": {
+    "shiftDurationMs": 180000,
+    "woolPerShift": 182351,
+    "refPercent": 10,
+    "minWithdraw": 4500000,
+    "rateTon": 450000000,
+    "settlementHourUtc": 8,
+    "maxWithdrawsPerDay": 1
+  }
+}

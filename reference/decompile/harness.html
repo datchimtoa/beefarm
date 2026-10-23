@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>capture-harness</title></head>
+<body style="margin:0">
+<!-- Intercepts the original page so the Telegram guard passes and the
+     authenticated game view can be screenshotted. Test-only. -->
+<iframe id="f" src="http://127.0.0.1:8788/harness.html"
+        style="width:390px;height:844px;border:0"></iframe>
+<script>
+  const frame = document.getElementById('f');
+  frame.addEventListener('load', () => {
+    const w = frame.contentWindow;
+    w.Telegram = {
+      WebApp: {
+        initData: 'auth_date=1&hash=deadbeef&user=%7B%22id%22%3A42%7D',
+        initDataUnsafe: { user: { id: 42, language_code: 'en' } },
+        ready(){}, expand(){}, disableVerticalSwipes(){},
+        enableClosingConfirmation(){}, setHeaderColor(){}, setBackgroundColor(){},
+        openTelegramLink(u){ w.__opened = u; }, shareMessage(){}, switchInlineQuery(){},
+        close(){}, HapticFeedback:{ impactOccurred(){}, notificationOccurred(){} }
+      }
+    };
+    w.show_11373165 = (o) => { w.__adArgs = o; return Promise.resolve(); };
+  });
+</script>
+</body>
+</html>
