@@ -20,3 +20,5 @@ server/fixtures/state.*.json
 # tooling leftovers
 /tools/
 *.log
+.vercel
+.env*

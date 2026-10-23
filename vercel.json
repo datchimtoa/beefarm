@@ -3,13 +3,13 @@
   "buildCommand": "npm --prefix apps/api install --omit=dev && npm --prefix apps/web install && npm --prefix apps/web run build",
   "outputDirectory": "apps/web/dist",
   "functions": {
-    "apps/api/handler/vercel.js": {
+    "api/index.js": {
       "memory": 512,
       "maxDuration": 10
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/apps/api/handler/vercel" }
+    { "source": "/api/(.*)", "destination": "/api" }
   ],
   "headers": [
     {
