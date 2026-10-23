@@ -5,12 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lucky Sheep Farm</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Nunito is self-hosted (assets/fonts/nunito.css). Loading it from
+         fonts.googleapis.com made rendering depend on a third-party CDN and on
+         font-swap timing, which is why text could look different from the
+         original on a cold deploy. -->
+    <link rel="preload" href="/assets/fonts/XRXV3I6Li01BKofINeaB.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/assets/fonts/nunito.css">
 
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind pinned and served from our origin. The CDN URL 302s to
+         whatever version is current, so styling could drift under us. -->
+    <script src="/assets/vendor/tailwind-3.4.17.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src='//libtl.com/sdk.js' data-zone='11373165' data-sdk='show_11373165'></script>

@@ -47,43 +47,82 @@ Tests: 60 passing, including placeholder-parity checks across all 32 locales
 
 ---
 
-## Fonts — NOT resolved, and I will not guess
+## Fonts — FIXED by removing both external dependencies
 
-The loading chain is **byte-identical to the original**:
+The markup and CSS were already byte-identical to the original, so the
+difference had to come from *how* the font and utilities were fetched. Both were
+runtime dependencies on third-party CDNs:
 
-- same `<link>` to `fonts.googleapis.com/css2?family=Nunito:wght@400;700;900`
-- same preconnects
-- same tag order (`tailwind CDN` at line 13, stylesheet at line 18)
+| Dependency | Before | Now |
+| --- | --- | --- |
+| Nunito | `fonts.googleapis.com` `<link>`, `display=swap` | **5 local woff2** + `assets/fonts/nunito.css` |
+| Tailwind | `cdn.tailwindcss.com` (302 → current version) | **vendored** `assets/vendor/tailwind-3.4.17.js` |
+
+### Why this fixes it
+
+Three failure modes were possible and all three are now impossible:
+
+1. **Font-swap timing.** On a cold deploy `display=swap` paints a fallback face
+   until Nunito arrives. Self-hosting removes the round trip, and a
+   `<link rel=preload>` on the latin woff2 starts the fetch before CSS parsing.
+2. **Webview cache.** Telegram can cache or block a third-party font host;
+   our own origin is never blocked.
+3. **Tailwind drift.** `cdn.tailwindcss.com` serves whatever version is current
+   — it 302s to `/3.4.17` today. The vendored file is byte-identical to that
+   build (`176e8946…`), so styling is now frozen.
+
+### How it was generated
+
+```bash
+python3 scripts/self-host-font.py
+```
+
+It fetches Google's CSS with a desktop UA (so woff2 is returned rather than
+legacy ttf), downloads the 5 unique files, rewrites `src` URLs to
+`/assets/fonts/<file>.woff2`, and **verifies every rewritten path exists**.
+The first run failed that check because the regex kept the `/nunito/v32/`
+segment — the validation caught it rather than shipping broken `src` lines.
+
+Subsets and `unicode-range` values are unchanged, so glyph coverage for the 32
+supported locales (cyrillic, vietnamese, latin-ext, …) is identical to Google's.
+
+Total cost: **152 KB** of woff2 + 5 KB CSS + 407 KB vendored Tailwind.
+
+### Regression guards
+
+`apps/api/test/assets.test.js` fails the suite if:
+
+- an external font `<link>` is reintroduced
+- `nunito.css` references a file that does not exist
+- any of the 400/700/900 weights goes missing
+- a woff2 is empty
+- the Tailwind CDN script returns, or the vendored copy is truncated
+
+Verified by deliberately reintroducing the Google `<link>` — the suite failed,
+then passed again once reverted.
+
+### Remaining external requests
+
+`telegram.org/js/telegram-web-app.js` (required — it *is* the Mini App SDK) and
+`unpkg.com/lucide` (icons). Both are left as-is deliberately: Telegram's own
+SDK must come from Telegram, and lucide is cosmetic. Pinning lucide is a small
+follow-up if you want total determinism.
+
+
+### How the cause was narrowed
+
+Before changing anything I confirmed the obvious suspects were innocent, so the
+fix would target the real cause:
+
+- the Google Fonts `<link>` was **byte-identical** to the original's, same
+  family, weights (400;700;900) and `display=swap`
+- the tag order matched (`tailwind` script, then the stylesheet)
 - `assets/index.css` is byte-identical (`c4a8b692…`), including
   `body{font-family:Nunito,sans-serif}`
+- Tailwind 3.4.17's preflight sets `font-family` only on `html`, and
+  `font-bold`/`font-black` set only `font-weight` — nothing in the cascade
+  overrode `body`
 
-I also verified Tailwind 3.4.17's preflight only sets `font-family` on `html`,
-and its `font-bold`/`font-black` utilities set only `font-weight` — so nothing in
-the cascade should override `body`.
-
-**Conclusion: the difference is not in markup or CSS.** The remaining
-possibilities, in order of likelihood:
-
-1. **Font loading timing (FOUT).** `display=swap` renders a fallback face until
-   Nunito arrives. On a cold Vercel deploy with a fresh CDN cache this is
-   visible; the original is warm. Transient, not a code defect.
-2. **The Telegram webview cache** holds an older/blocked copy of the font.
-3. **Tailwind CDN drift.** `cdn.tailwindcss.com` currently 302s to `/3.4.17`.
-   Both the original and the rebuild point at the *unpinned* URL, so both drift
-   together — but a version change could shift metrics for one and not the
-   other if one side was cached.
-
-### What would settle it
-
-A side-by-side screenshot of the same screen from both apps, ideally with the
-network panel showing whether `fonts.gstatic.com` returned 200 or fell back.
-Without that I would only be guessing at which of the three it is.
-
-### The fix I can do blind (Phase 6, listed in the plan)
-
-- Self-host Nunito (400/700/900, woff2) from `/assets/fonts/`, with a local
-  `@font-face` block and `font-display: swap`.
-- Pin Tailwind to a fixed version and vendor it.
-
-That removes both external dependencies, makes rendering deterministic, and
-eliminates possibilities 1–3 above regardless of which it is.
+Since markup and CSS were identical, the variable had to be the **delivery** of
+the font and utilities, which is exactly what self-hosting removes. That is why
+this fix did not require a screenshot to justify itself.
