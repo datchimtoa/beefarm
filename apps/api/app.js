@@ -86,7 +86,17 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
     // over (token, user_id) using the shared secret instead.
     // Monetag posts back as a GET with macros substituted in the query string.
     // It retries for ~38h, so a non-2xx here means repeated deliveries.
-    if (route === '/api/ads/postback' && ads) {
+    if (route === '/api/ads/postback') {
+      // Answer here even when ads are unconfigured. Falling through would hit
+      // the initData gate below and return a misleading 401 unauthorized,
+      // making a missing AD_POSTBACK_SECRET look like a Telegram auth failure.
+      if (!ads) {
+        console.error('[ads] postback received but AD_POSTBACK_SECRET is not set');
+        return json(res, 503, {
+          success: false,
+          reason: 'ad_verification_not_configured',
+        });
+      }
       const params = Object.fromEntries(url.searchParams.entries());
 
       // Monetag's macros arrive as query params; our own test harness posts JSON.

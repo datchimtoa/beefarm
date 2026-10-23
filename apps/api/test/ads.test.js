@@ -16,6 +16,19 @@ function make(opts = {}) {
   return { v, forgeries, advance: (ms) => (clock += ms) };
 }
 
+/**
+ * Flip the last hex nibble of a signature so it is guaranteed to differ.
+ *
+ * The obvious `slice(0, -1) + '0'` is wrong: when the real signature already
+ * ends in '0' (~1/16 of the time) the "forgery" is byte-identical to the valid
+ * one and the test fails intermittently for no real reason.
+ */
+function tamperedSignature(sig) {
+  const last = sig.slice(-1);
+  const flipped = last === '0' ? '1' : '0';
+  return sig.slice(0, -1) + flipped;
+}
+
 test('a valid postback redeems a shift token', () => {
   const { v } = make();
   const token = v.issue('42');
@@ -41,7 +54,7 @@ test('a client cannot forge a postback without the provider secret', () => {
 
   const guesses = [
     '', 'x', 'deadbeef',
-    v.sign(token, '42').slice(0, -1) + '0', // one nibble off
+    tamperedSignature(v.sign(token, '42')), // one nibble off, always different
     v.sign('other', '42'),                  // signature for a different token
     v.sign(token, '999'),                   // signature for a different user
   ];

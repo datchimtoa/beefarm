@@ -17,8 +17,14 @@
 //     reward_event_type. The Promise only drives the UI; the postback grants
 //     the reward. Never reward from `then()`.
 
-/** Loaded zone id. Set via VITE_AD_ZONE, e.g. "1234567". */
-export const AD_ZONE = import.meta.env?.VITE_AD_ZONE ?? '';
+/**
+ * Monetag zone id.
+ *
+ * Defaults to the rewarded-interstitial zone from adsandanything.md so a build
+ * works without extra configuration; VITE_AD_ZONE overrides it for other
+ * environments (e.g. a test zone).
+ */
+export const AD_ZONE = import.meta.env?.VITE_AD_ZONE || '12109522';
 
 /** Global function the SDK creates: show_<zone>. */
 export function adFunctionName(zone = AD_ZONE) {

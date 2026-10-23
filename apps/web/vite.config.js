@@ -19,7 +19,8 @@ function monetagZone() {
   return {
     name: 'monetag-zone',
     transformIndexHtml(html) {
-      const zone = process.env.VITE_AD_ZONE ?? '';
+      // Must match the default in apps/web/src/ads.js, otherwise the tag is
+      const zone = process.env.VITE_AD_ZONE || '12109522';
       if (!zone) {
         return html.replace(/^.*__AD_ZONE__.*$/m, '    <!-- Monetag SDK omitted: VITE_AD_ZONE not set -->');
       }
