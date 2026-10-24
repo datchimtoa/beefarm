@@ -52,6 +52,12 @@ async function request(path, { method = 'GET', body } = {}) {
 export const api = {
   me: () => request('/api/me'),
 
+  /** Persist the player's language (the original saved it to their record). */
+  setLanguage: (language) => request('/api/settings', { method: 'POST', body: { language } }),
+
+  /** Persist the audio preference. */
+  setAudio: (audioEnabled) => request('/api/settings', { method: 'POST', body: { audioEnabled } }),
+
   /** Has the ad provider's postback confirmed this token yet? */
   adStatus: (token) => request(`/api/ads/status?token=${encodeURIComponent(token)}`),
 

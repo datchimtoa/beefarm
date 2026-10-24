@@ -19,6 +19,7 @@ import {
 } from './render.js';
 import { loadLocale, t, locale } from './i18n.js';
 import { showRewardedAd } from './ads.js';
+import LANGUAGES from './languages.json';
 
 const TASKS = [
   { id: 't1', channel: 'Lucky Sheep Farm Channel', reward: 5_000, type: 'channel' },
@@ -214,8 +215,13 @@ function start({ webApp, user }) {
       }
       // Ads are not gated on this deployment: start the shift straight away.
       store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime });
-    } catch {
-      // Retried when the player clicks.
+    } catch (err) {
+      // Do not swallow this: a failed prime is why the player later sees
+      // "Ads are currently unavailable", which hides the real cause.
+      console.warn('[ads] priming the ad token failed:', err?.code ?? err?.message ?? err);
+      if (err instanceof ApiError && err.code !== 'ad_required') {
+        showFatal(message(err.code));
+      }
     }
     return '';
   }
@@ -344,15 +350,113 @@ function start({ webApp, user }) {
 
   function bindSettings() {
     const modal = el('settings-modal');
-    el('btn-settings')?.addEventListener('click', () => modal?.classList.remove('hidden'));
-    el('btn-close-settings')?.addEventListener('click', () => modal?.classList.add('hidden'));
-    el('settings-backdrop')?.addEventListener('click', () => modal?.classList.add('hidden'));
+    const dropdown = el('language-dropdown');
+    const list = el('lang-dropdown-list');
+    const selectedText = el('lang-selected-text');
+    const arrow = el('lang-dropdown-icon');
+
+    const openSettings = () => {
+      modal?.classList.remove('hidden');
+      buildLanguageList();
+    };
+    const closeSettings = () => {
+      modal?.classList.add('hidden');
+      closeDropdown();
+    };
+
+    el('btn-settings')?.addEventListener('click', openSettings);
+    el('btn-close-settings')?.addEventListener('click', closeSettings);
+    el('settings-backdrop')?.addEventListener('click', closeSettings);
+
+    function closeDropdown() {
+      list?.classList.remove('open');
+      el('lang-setting-group')?.classList.remove('dropdown-open');
+      el('lang-dropdown-header')?.classList.remove('open-state');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+    }
+
+    function openDropdown() {
+      list?.classList.add('open');
+      el('lang-setting-group')?.classList.add('dropdown-open');
+      el('lang-dropdown-header')?.classList.add('open-state');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+
+    // The original built this list from a hard-coded table of native names
+    // (T = [{code, label}]) and re-labelled the selected entry on each change.
+    function buildLanguageList() {
+      if (!list) return;
+      if (selectedText) {
+        const current = LANGUAGES.find((l) => l.code === locale());
+        selectedText.textContent = current?.label ?? 'English';
+      }
+      list.innerHTML = '';
+      for (const lang of LANGUAGES) {
+        const item = document.createElement('li');
+        item.className = 'custom-dropdown-item';
+        item.textContent = lang.label;
+        item.dataset.lang = lang.code;
+        if (lang.code === locale()) item.classList.add('selected');
+        item.addEventListener('click', (event) => {
+          event.stopPropagation();
+          closeDropdown();
+          chooseLanguage(lang.code);
+        });
+        list.appendChild(item);
+      }
+    }
+
+    async function chooseLanguage(code) {
+      if (code === locale()) return;
+      try {
+        const applied = await loadLocale(code);
+        store.set({ language: applied });
+        applyTranslations();
+        renderState(store.get());
+        renderTasks(TASKS, store.get().completedTasks);
+        if (selectedText) {
+          const entry = LANGUAGES.find((l) => l.code === applied);
+          selectedText.textContent = entry?.label ?? 'English';
+        }
+        // Remember the choice server-side, like the original did with
+        // update(ref(db, `users/${id}`), { language }).
+        api.setLanguage?.(applied).catch(() => {});
+      } catch (err) {
+        handleError(err);
+      }
+    }
+
+    el('lang-dropdown-header')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (list?.classList.contains('open')) closeDropdown();
+      else openDropdown();
+    });
+
+    // Clicking elsewhere closes the dropdown (original behaviour).
+    document.addEventListener('click', (event) => {
+      if (dropdown && !dropdown.contains(event.target)) closeDropdown();
+    });
 
     const toggle = el('toggle-audio-btn');
+    const dot = el('audio-switch-dot');
+
+    function paintAudio(enabled) {
+      toggle?.setAttribute('aria-pressed', String(enabled));
+      if (!dot) return;
+      dot.classList.toggle('translate-x-6', enabled);
+      dot.classList.toggle('translate-x-0', !enabled);
+      toggle?.classList.toggle('bg-[#97BA42]', enabled);
+      toggle?.classList.toggle('bg-[#FF6B6B]', !enabled);
+    }
+
     toggle?.addEventListener('click', () => {
       const next = !store.get().audioEnabled;
       store.set({ audioEnabled: next });
-      toggle.setAttribute('aria-pressed', String(next));
+      paintAudio(next);
+      api.setAudio?.(next).catch(() => {});
     });
+
+    paintAudio(store.get().audioEnabled);
+    buildLanguageList();
   }
 }

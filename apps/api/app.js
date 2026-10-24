@@ -186,6 +186,20 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
         return json(res, 200, { success: true, watched });
       }
 
+      // Player preferences. The original wrote these straight to the database
+      // from the browser; here they go through the server like everything else.
+      if (req.method === 'POST' && route === '/api/settings') {
+        const body = await readBody(req);
+        const patch = {};
+        if (typeof body.language === 'string') patch.language = body.language.slice(0, 12);
+        if (typeof body.audioEnabled === 'boolean') patch.audioEnabled = body.audioEnabled;
+        if (Object.keys(patch).length === 0) {
+          return failure(res, ERR.INVALID_AMOUNT);
+        }
+        await economy.updateSettings(userId, patch);
+        return json(res, 200, { success: true });
+      }
+
       if (req.method === 'GET' && route === '/api/me') {
         const config = await economy.config();
         const user = await economy.user(userId);

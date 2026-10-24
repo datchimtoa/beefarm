@@ -93,6 +93,21 @@ export class Economy {
     return user;
   }
 
+  /**
+   * Update player preferences (language, audio). These are cosmetic, so no
+   * economy rule applies beyond the player being a real, non-banned user.
+   * @param {string} telegramId
+   * @param {{language?: string, audioEnabled?: boolean}} patch
+   */
+  async updateSettings(telegramId, patch) {
+    const user = await this.user(telegramId);
+    if (user.banned) return { error: ERR.BANNED };
+    if (typeof patch.language === 'string') user.language = patch.language;
+    if (typeof patch.audioEnabled === 'boolean') user.audioEnabled = patch.audioEnabled;
+    await this.#save(user);
+    return { ok: true };
+  }
+
   /** Public view of a user; hides internal fields. */
   static view(user, config) {
     return {
