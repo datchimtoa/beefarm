@@ -172,6 +172,20 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
         return json(res, 200, { success: true, id: userId });
       }
 
+      // Poll after showing an ad.
+      //
+      // Monetag confirms the impression server-to-server, so the shift cannot
+      // start the instant the SDK Promise resolves: that call would race the
+      // postback, return ad_required again, and the UI would snap back to
+      // WAITING FOR SHEARING a couple of seconds after the click.
+      if (req.method === 'GET' && route === '/api/ads/status') {
+        const token = url.searchParams.get('token') ?? '';
+        if (!ads) return json(res, 503, { success: false, reason: 'ad_verification_not_configured' });
+        if (!token) return json(res, 400, { success: false, reason: 'missing_token' });
+        const watched = ads.isAdWatched(userId, token);
+        return json(res, 200, { success: true, watched });
+      }
+
       if (req.method === 'GET' && route === '/api/me') {
         const config = await economy.config();
         const user = await economy.user(userId);

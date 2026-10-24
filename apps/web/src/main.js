@@ -74,6 +74,7 @@ function start({ webApp, user }) {
       finishLoader();
       hideFatal();
       markReady(webApp);
+      primeAdToken();
     } catch (err) {
       hideLoader();
       handleError(err);
@@ -143,20 +144,45 @@ function start({ webApp, user }) {
           const res = await api.harvest();
           store.set({ wool: res.wool, pendingWool: 0, workEndTime: 0 });
           toast(t('toast_collect_success', { amount: formatNumber(res.credited) }));
+          primeAdToken();
           if (res.referral)
             toast(t('toast_ref_earned', { amount: formatNumber(res.referral.bonus) }));
           return;
         }
 
-        // phase === 'start': the server decides whether an ad is required.
-        let res = await api.harvest();
-        if (res.token) {
-          const watched = await playAd(res.token);
-          if (!watched) throw new ApiError('ad_required', 402);
-          res = await api.harvest(res.token);
+        // phase === 'start'.
+        //
+        // The ad token must already be in hand when the player clicks: Monetag
+        // refuses to open an ad unless it is called during the click's user
+        // gesture, and awaiting a fetch first consumes that gesture. The token
+        // is fetched ahead of time by primeAdToken().
+        const token = store.get().adToken;
+        if (!token) {
+          toast(t('toast_no_ads'), 'error');
+          primeAdToken();
+          return;
         }
-        store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime });
+
+        const shown = await playAd(token);
+        if (!shown) {
+          primeAdToken();
+          throw new ApiError('ad_required', 402);
+        }
+
+        // The reward comes from Monetag's server-to-server postback, which lands
+        // after the SDK Promise resolves. Waiting for it is what stops the button
+        // snapping back to WAITING FOR SHEARING a couple of seconds after click.
         toast(t('toast_ad_waiting'));
+        const confirmed = await waitForAdConfirmation(token);
+        if (!confirmed) {
+          toast(t('toast_no_ads'), 'error');
+          primeAdToken();
+          return;
+        }
+
+        const res = await api.harvest(token);
+        store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime, adToken: '' });
+        primeAdToken();
       })
     );
   }
@@ -166,6 +192,55 @@ function start({ webApp, user }) {
    * the shift when the provider's postback arrives, so skipping it locally
    * gains nothing.
    */
+
+
+  /**
+   * Fetch an ad token ahead of the click.
+   *
+   * Monetag will not open an ad outside a user gesture, so the token cannot be
+   * requested in the click handler (the await would spend the gesture). Instead
+   * one is requested as soon as the button is clickable and kept in the store.
+   * Requesting costs nothing: the server only issues a nonce.
+   */
+  async function primeAdToken() {
+    const state = store.get();
+    if (state.adToken) return state.adToken;
+    if (state.pendingWool > 0) return ''; // a shift is running; no ad needed yet
+    try {
+      const res = await api.harvest();
+      if (res.token) {
+        store.set({ adToken: res.token });
+        return res.token;
+      }
+      // Ads are not gated on this deployment: start the shift straight away.
+      store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime });
+    } catch {
+      // Retried when the player clicks.
+    }
+    return '';
+  }
+
+  /**
+   * Poll until the ad postback marks the token watched.
+   *
+   * Monetag retries for ~38h on their side, but the normal case is a couple of
+   * seconds. Polling keeps the player informed instead of silently reverting.
+   *
+   * @returns {Promise<boolean>} true once confirmed, false on timeout
+   */
+  async function waitForAdConfirmation(token, { attempts = 20, intervalMs = 1000 } = {}) {
+    for (let i = 0; i < attempts; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      try {
+        const { watched } = await api.adStatus(token);
+        if (watched) return true;
+      } catch {
+        // Transient network error: keep polling rather than failing the player.
+      }
+    }
+    return false;
+  }
+
   /**
    * Show the rewarded interstitial.
    *

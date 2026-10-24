@@ -52,6 +52,9 @@ async function request(path, { method = 'GET', body } = {}) {
 export const api = {
   me: () => request('/api/me'),
 
+  /** Has the ad provider's postback confirmed this token yet? */
+  adStatus: (token) => request(`/api/ads/status?token=${encodeURIComponent(token)}`),
+
   /** Start a shift or collect a finished one. */
   harvest: (adToken) => request('/api/harvest', { method: 'POST', body: adToken ? { adToken } : {} }),
 

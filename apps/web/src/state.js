@@ -18,6 +18,9 @@ export const DEFAULTS = {
   audioEnabled: true,
   minWithdraw: 4_500_000,
   rateTon: 450_000_000,
+  // Pre-fetched ad nonce. Kept in state because Monetag must be called
+  // inside the click's user gesture, so no network call can happen first.
+  adToken: '',
 };
 
 export function createStore(initial = {}) {
