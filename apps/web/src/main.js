@@ -216,8 +216,18 @@ function start({ webApp, user }) {
       // Ads are not gated on this deployment: start the shift straight away.
       store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime });
     } catch (err) {
-      // Do not swallow this: a failed prime is why the player later sees
-      // "Ads are currently unavailable", which hides the real cause.
+      // 402 ad_required is the EXPECTED response here, not a failure: the server
+      // is telling us to show an ad and handing back a nonce. api.harvest()
+      // throws on any non-2xx, so the token arrives on err.extra and used to be
+      // discarded — which left store.adToken empty, made the click bail out with
+      // "ads unavailable", and meant show_12109522 was never called at all.
+      if (err instanceof ApiError && err.code === 'ad_required') {
+        const token = err.extra?.token;
+        if (token) {
+          store.set({ adToken: token });
+          return token;
+        }
+      }
       console.warn('[ads] priming the ad token failed:', err?.code ?? err?.message ?? err);
       if (err instanceof ApiError && err.code !== 'ad_required') {
         showFatal(message(err.code));
