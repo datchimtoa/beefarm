@@ -71,6 +71,28 @@ export class FirebaseStore {
     return result.snapshot.exists() ? result.snapshot.val() : null;
   }
 
+
+  // -- ad tokens ---------------------------------------------------
+  // Cross-instance durability. A Vercel function has no shared memory between
+  // invocations, so the token issued when the player pressed SHEAR must be
+  // readable when Monetag's postback arrives on another instance.
+
+  async getAdToken(tokenId) {
+    const db = await this.#database();
+    const snap = await db.ref(`ad_tokens/${tokenId}`).get();
+    return snap.exists() ? snap.val() : null;
+  }
+
+  async putAdToken(tokenId, record) {
+    const db = await this.#database();
+    await db.ref(`ad_tokens/${tokenId}`).set(record);
+  }
+
+  async deleteAdToken(tokenId) {
+    const db = await this.#database();
+    await db.ref(`ad_tokens/${tokenId}`).remove();
+  }
+
   async getConfig() {
     const db = await this.#database();
     const snap = await db.ref('system_config').get();

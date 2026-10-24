@@ -60,11 +60,16 @@ function getApp() {
     console.error('[vercel] BOT_TOKEN missing: every initData check will fail');
   }
 
+  const store = buildStore();
+
+  // The verifier must share the durable store: on Vercel the postback routinely
+  // lands on a different instance than the one that issued the token, so an
+  // in-process map would never find it and the reward would be lost.
   const ads = process.env.AD_POSTBACK_SECRET
-    ? new AdVerifier({ secret: process.env.AD_POSTBACK_SECRET })
+    ? new AdVerifier({ secret: process.env.AD_POSTBACK_SECRET, store })
     : null;
 
-  const economy = new Economy({ store: buildStore(), ads });
+  const economy = new Economy({ store, ads });
 
   app = createApp({
     economy,

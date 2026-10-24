@@ -158,9 +158,9 @@ export class Economy {
     // Starting a new shift requires a verified ad. Collecting an already
     // finished shift above is deliberately NOT gated: the player earned it.
     if (this.ads) {
-      if (!this.ads.consumeForShift(telegramId, adToken)) {
+      if (!(await this.ads.consumeForShift(telegramId, adToken))) {
         // Not watched yet (or already used): hand out a fresh token.
-        return { error: ERR.AD_REQUIRED, token: this.ads.issue(telegramId) };
+        return { error: ERR.AD_REQUIRED, token: await this.ads.issue(telegramId) };
       }
     }
 

@@ -3,6 +3,7 @@
 export class MemoryStore {
   constructor(config = {}) {
     this.users = new Map();
+    this.adTokens = new Map();
     this.config = config;
   }
 
@@ -29,6 +30,24 @@ export class MemoryStore {
     next.updatedAt = Date.now();
     this.users.set(key, next);
     return structuredClone(next);
+  }
+
+
+  // -- ad tokens ---------------------------------------------------
+  // Kept in the store rather than in process memory so that a postback can be
+  // handled by a different instance than the one that issued the token. On
+  // Vercel two requests routinely land on different serverless instances.
+
+  async getAdToken(tokenId) {
+    return this.adTokens.get(String(tokenId)) ?? null;
+  }
+
+  async putAdToken(tokenId, record) {
+    this.adTokens.set(String(tokenId), { ...record });
+  }
+
+  async deleteAdToken(tokenId) {
+    this.adTokens.delete(String(tokenId));
   }
 
   async getConfig() {

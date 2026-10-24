@@ -102,7 +102,7 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
       // Monetag's macros arrive as query params; our own test harness posts JSON.
       const isMonetag = 'ymid' in params && 'reward_event_type' in params;
       if (isMonetag) {
-        const result = ads.handleMonetagPostback(params);
+        const result = await ads.handleMonetagPostback(params);
         if (!result.ok) {
           // A non_valued impression is expected and not a failure worth 500ing:
           // answer 200 so Monetag stops retrying, but grant nothing.
@@ -122,7 +122,7 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
       }
 
       const body = await readBody(req);
-      const result = ads.handlePostback(body);
+      const result = await ads.handlePostback(body);
       if (!result.ok) {
         console.warn('[ads] rejected postback', { reason: result.reason });
         return json(res, 400, { success: false, reason: result.reason });
@@ -182,7 +182,7 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
         const token = url.searchParams.get('token') ?? '';
         if (!ads) return json(res, 503, { success: false, reason: 'ad_verification_not_configured' });
         if (!token) return json(res, 400, { success: false, reason: 'missing_token' });
-        const watched = ads.isAdWatched(userId, token);
+        const watched = await ads.isAdWatched(userId, token);
         return json(res, 200, { success: true, watched });
       }
 

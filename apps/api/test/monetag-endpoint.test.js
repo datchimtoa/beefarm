@@ -55,7 +55,7 @@ test('a non_valued postback answers 200 so Monetag stops retrying', async (t) =>
   const { AdVerifier } = await import('../lib/ads.js');
 
   const ads = new AdVerifier({ secret: 's' });
-  const token = ads.issue('42');
+  const token = await ads.issue('42');
   const economy = new Economy({ store: new MemoryStore(), ads });
   const app = createApp({ economy, botToken: '1:x', ads, isMember: async () => true });
   const server = http.createServer(app);
@@ -70,5 +70,5 @@ test('a non_valued postback answers 200 so Monetag stops retrying', async (t) =>
   // 2xx stops the ~38h retry loop; the reward is simply not granted.
   assert.equal(res.status, 200);
   assert.equal((await res.json()).reason, 'not_valued');
-  assert.equal(ads.isAdWatched('42', token), false);
+  assert.equal(await ads.isAdWatched('42', token), false);
 });

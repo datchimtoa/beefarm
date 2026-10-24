@@ -14,6 +14,28 @@ import crypto from 'node:crypto';
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
 /**
+ * Fallback token store, used only when AdVerifier is constructed without one
+ * (unit tests). Production always passes the durable store, because a
+ * per-process map cannot be shared between serverless instances.
+ */
+class InMemoryAdTokens {
+  constructor() {
+    this.tokens = new Map();
+  }
+  async getAdToken(id) {
+    return this.tokens.get(String(id)) ?? null;
+  }
+  async putAdToken(id, record) {
+    this.tokens.set(String(id), { ...record });
+  }
+  async deleteAdToken(id) {
+    this.tokens.delete(String(id));
+  }
+}
+
+
+
+/**
  * One-time ad tokens. In-memory is fine for a single instance; swap for Redis
  * or a Firebase node when you run more than one process.
  */
@@ -25,62 +47,78 @@ export class AdVerifier {
    * @param {number} [opts.ttlMs]        how long a token stays valid
    * @param {(token: object) => void} [opts.onForgery]
    */
-  constructor({ secret, now = () => Date.now(), ttlMs = DEFAULT_TTL_MS, onForgery } = {}) {
+  constructor({ secret, store, now = () => Date.now(), ttlMs = DEFAULT_TTL_MS, onForgery } = {}) {
     if (!secret) throw new Error('AdVerifier requires a secret');
     this.secret = secret;
     this.now = now;
     this.ttlMs = ttlMs;
     this.onForgery = onForgery;
-    this.pending = new Map(); // tokenId -> { userId, expiresAt }
-    this.consumed = new Set(); // tokenIds already redeemed
-    this.watchedBy = new Map(); // tokenId -> userId that redeemed it
-    this.spent = new Set(); // tokenIds already used to start a shift
+
+    // Tokens live in the store, not in this object.
+    //
+    // They used to be Maps on the verifier instance. That breaks on Vercel,
+    // where a postback routinely lands on a different serverless instance than
+    // the one that issued the token: the lookup found nothing, returned
+    // unknown_or_expired, and the player never got the reward even when the ad
+    // had been watched in full. Keeping them in the store makes the flow
+    // instance-independent.
+    this.store = store ?? new InMemoryAdTokens();
   }
 
   /** Issue a token for a shift. Returns the opaque id to hand to the client. */
-  issue(userId) {
+  async issue(userId) {
     const tokenId = crypto.randomBytes(16).toString('hex');
-    this.pending.set(tokenId, { userId: String(userId), expiresAt: this.now() + this.ttlMs });
-    this.#sweep();
+    await this.store.putAdToken(tokenId, {
+      userId: String(userId),
+      status: 'pending', // pending -> watched -> spent
+      expiresAt: this.now() + this.ttlMs,
+    });
     return tokenId;
   }
 
-  /** True when the user has a valid, unexpired, unredeemed token. */
-  isTokenLive(userId, tokenId) {
-    const rec = this.pending.get(tokenId);
+  /** Load a token, rejecting it when missing, expired, or issued to someone else. */
+  async #live(userId, tokenId) {
+    if (!tokenId) return null;
+    const rec = await this.store.getAdToken(tokenId);
+    if (!rec) return null;
+    if (String(rec.userId) !== String(userId)) return null;
+    if (Number(rec.expiresAt) < this.now()) return null;
+    return rec;
+  }
+
+  /** True when the token exists, belongs to this user, and has not expired. */
+  async isTokenLive(userId, tokenId) {
+    return (await this.#live(userId, tokenId)) !== null;
+  }
+
+  /**
+   * True only once the provider's postback has released the reward.
+   * Issuing a token is NOT watching an ad, so this stays false until
+   * `handleMonetagPostback` marks it watched.
+   */
+  async isAdWatched(userId, tokenId) {
+    const rec = await this.#live(userId, tokenId);
+    return Boolean(rec) && rec.status === 'watched';
+  }
+
+  /**
+   * Spend a watched token so it can only start ONE shift.
+   * Without this a single watched ad would fund unlimited shifts.
+   */
+  async consumeForShift(userId, tokenId) {
+    const rec = await this.#live(userId, tokenId);
+    if (!rec || rec.status !== 'watched') return false;
+    // Mark spent first so a concurrent request cannot spend it twice.
+    await this.store.putAdToken(tokenId, { ...rec, status: 'spent' });
+    return true;
+  }
+
+  /** Mark a live token watched. Returns false when it cannot be redeemed. */
+  async redeem(userId, tokenId) {
+    const rec = await this.#live(userId, tokenId);
     if (!rec) return false;
-    if (rec.userId !== String(userId)) return false;
-    if (rec.expiresAt < this.now()) return false;
-    return true;
-  }
-
-  /**
-   * True only once the provider's postback has redeemed the token.
-   * Issuing a token is NOT watching an ad — this is the check that gates a
-   * shift, so it must stay false until `handlePostback` succeeds.
-   */
-  isAdWatched(userId, tokenId) {
-    return this.consumed.has(tokenId) && this.watchedBy.get(tokenId) === String(userId);
-  }
-
-  /**
-   * Spend a redeemed token so it can only start ONE shift.
-   * Without this, a single watched ad would fund unlimited shifts.
-   */
-  consumeForShift(userId, tokenId) {
-    if (!this.isAdWatched(userId, tokenId)) return false;
-    this.watchedBy.delete(tokenId);
-    this.consumed.delete(tokenId);
-    this.spent.add(tokenId);
-    return true;
-  }
-
-  /** Consume a token. Idempotent-safe: a token can only be redeemed once. */
-  redeem(userId, tokenId) {
-    if (!this.isTokenLive(userId, tokenId)) return false;
-    this.pending.delete(tokenId);
-    this.consumed.add(tokenId);
-    this.watchedBy.set(tokenId, String(userId));
+    if (rec.status !== 'pending') return false;
+    await this.store.putAdToken(tokenId, { ...rec, status: 'watched' });
     return true;
   }
 
@@ -105,7 +143,7 @@ export class AdVerifier {
    *
    * @param {Record<string,string>} query
    */
-  handleMonetagPostback(query = {}) {
+  async handleMonetagPostback(query = {}) {
     const provided = String(query.secret ?? '');
     const a = Buffer.from(String(this.secret), 'utf8');
     const b = Buffer.from(provided, 'utf8');
@@ -127,12 +165,11 @@ export class AdVerifier {
       return { ok: false, reason: 'not_valued', telegramId, tokenId };
     }
 
-    if (this.spent.has(tokenId)) return { ok: false, reason: 'already_spent' };
-    if (this.consumed.has(tokenId)) return { ok: false, reason: 'already_redeemed' };
-    if (!this.isTokenLive(telegramId, tokenId)) {
-      return { ok: false, reason: 'unknown_or_expired', telegramId, tokenId };
-    }
-    if (!this.redeem(telegramId, tokenId)) {
+    const rec = await this.#live(telegramId, tokenId);
+    if (!rec) return { ok: false, reason: 'unknown_or_expired', telegramId, tokenId };
+    if (rec.status === 'spent') return { ok: false, reason: 'already_spent' };
+    if (rec.status === 'watched') return { ok: false, reason: 'already_redeemed' };
+    if (!(await this.redeem(telegramId, tokenId))) {
       return { ok: false, reason: 'unknown_or_expired', telegramId, tokenId };
     }
 
@@ -148,7 +185,7 @@ export class AdVerifier {
     };
   }
 
-  handlePostback(body = {}) {
+  async handlePostback(body = {}) {
     const tokenId = String(body.token ?? body.token_id ?? '');
     const userId = String(body.user_id ?? body.ymid ?? '');
     const signature = String(body.signature ?? '');
@@ -169,16 +206,11 @@ export class AdVerifier {
       return { ok: false, reason: 'bad_signature' };
     }
 
-    if (this.spent.has(tokenId)) {
-      return { ok: false, reason: 'already_spent' };
-    }
-    if (this.consumed.has(tokenId)) {
-      return { ok: false, reason: 'already_redeemed' };
-    }
-    if (!this.isTokenLive(userId, tokenId)) {
-      return { ok: false, reason: 'unknown_or_expired' };
-    }
-    if (!this.redeem(userId, tokenId)) {
+    const rec = await this.#live(userId, tokenId);
+    if (!rec) return { ok: false, reason: 'unknown_or_expired' };
+    if (rec.status === 'spent') return { ok: false, reason: 'already_spent' };
+    if (rec.status === 'watched') return { ok: false, reason: 'already_redeemed' };
+    if (!(await this.redeem(userId, tokenId))) {
       return { ok: false, reason: 'unknown_or_expired' };
     }
     return { ok: true, userId };
