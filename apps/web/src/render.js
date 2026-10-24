@@ -2,6 +2,7 @@
 // consequence of the store rather than scattered mutations.
 import { formatNumber, toGram } from './state.js';
 import { t } from './i18n.js';
+import { spawnWoolReward, startShearEffect, stopShearEffect } from './effects.js';
 import { formatCountdown, isWithdrawLocked, nextSettlement } from './clock.js';
 
 const $ = (id) => document.getElementById(id);
@@ -148,6 +149,10 @@ function renderMainAction(state, now) {
     if (icon) icon.setAttribute('data-lucide', 'scissors');
     btn.disabled = false;
     btn.dataset.phase = 'start';
+    stopShearEffect();
+    $('scissors-img')?.classList.add('hidden');
+    // The original hides the timer/action cards until a shift exists.
+    $('normal-action-cards')?.classList.add('hidden');
   } else if (ready) {
     if (bigTimer) bigTimer.textContent = t('status_ready');
     if (txt) txt.textContent = t('harvest_btn');
@@ -155,6 +160,9 @@ function renderMainAction(state, now) {
     if (icon) icon.setAttribute('data-lucide', 'package-open');
     btn.disabled = false;
     btn.dataset.phase = 'harvest';
+    stopShearEffect();
+    $('scissors-img')?.classList.add('hidden');
+    $('normal-action-cards')?.classList.remove('hidden');
   } else {
     if (bigTimer) bigTimer.textContent = formatCountdown(state.workEndTime - now);
     if (txt) txt.textContent = t('status_working');
@@ -162,6 +170,9 @@ function renderMainAction(state, now) {
     if (icon) icon.setAttribute('data-lucide', 'timer');
     btn.disabled = true;
     btn.dataset.phase = 'working';
+    startShearEffect($('wool-particles'));
+    $('scissors-img')?.classList.remove('hidden');
+    $('normal-action-cards')?.classList.remove('hidden');
   }
   globalThis.lucide?.createIcons?.();
 }
@@ -180,6 +191,22 @@ function renderWithdraw(state, now) {
       state.minWithdraw,
       state.rateTon
     )} GRAM`;
+  }
+
+  // The payout countdown box is only meaningful while a withdrawal is pending.
+  const truckBox = $('truck-timer-box');
+  if (truckBox) truckBox.classList.toggle('hidden', !locked);
+
+  // The original re-labelled the countdown card per state, so reuse its strings.
+  if (countdown) {
+    const heading = countdown.querySelector('h3');
+    const note = countdown.querySelector('p');
+    if (heading) heading.textContent = t(locked ? 'withdraw_waiting_truck' : 'truck_arrived');
+    if (note && locked) {
+      note.textContent = t('withdraw_waiting_desc', {
+        time: nextSettlement(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
   }
 
   if (locked) {

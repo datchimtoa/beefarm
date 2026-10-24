@@ -20,6 +20,8 @@ import {
 import { loadLocale, t, locale } from './i18n.js';
 import { showRewardedAd } from './ads.js';
 import LANGUAGES from './languages.json';
+import { spawnWoolReward } from './effects.js';
+import { bindConnectionWatcher } from './connection.js';
 
 const TASKS = [
   { id: 't1', channel: 'Lucky Sheep Farm Channel', reward: 5_000, type: 'channel' },
@@ -57,6 +59,7 @@ function start({ webApp, user }) {
   bindWithdraw();
   bindReferral();
   bindSettings();
+  bindConnectionWatcher();
 
   applyTranslations();
   store.subscribe((state) => renderState(state));
@@ -144,6 +147,9 @@ function start({ webApp, user }) {
         if (phase === 'harvest') {
           const res = await api.harvest();
           store.set({ wool: res.wool, pendingWool: 0, workEndTime: 0 });
+          // The original floated "+N 🐑" up from the harvest point; without it
+          // collecting wool felt like nothing had happened.
+          spawnWoolReward(el('wool-particles'), formatNumber(res.credited));
           toast(t('toast_collect_success', { amount: formatNumber(res.credited) }));
           primeAdToken();
           if (res.referral)

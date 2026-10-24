@@ -175,6 +175,19 @@ def is_ancestor(repo, maybe_ancestor: bytes, descendant: bytes) -> bool:
     return False
 
 
+
+def _message(paths):
+    """Commit message: env COMMIT_MESSAGE_FILE wins, then build_message().
+
+    Long, pre-formatted messages are easier to write to a file than to escape
+    through a shell.
+    """
+    path = os.environ.get('COMMIT_MESSAGE_FILE')
+    if path:
+        with open(path, 'rb') as fh:
+            return fh.read()
+    return build_message(paths)
+
 def main() -> int:
     from dulwich import porcelain
     from dulwich.repo import Repo
@@ -223,7 +236,7 @@ def main() -> int:
 
     sha = porcelain.commit(
         str(ROOT),
-        message=build_message(paths),
+        message=_message(paths),
         author=AUTHOR,
         committer=AUTHOR,
     )
