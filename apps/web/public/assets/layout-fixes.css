@@ -1,0 +1,50 @@
+/* Layout adjustments (deliberate deviation from the original).
+ *
+ * The original's Farm tab is taller than the viewport: the SHEAR/HARVEST button
+ * sits below the fold and you must scroll to reach it. That was reported from
+ * real device testing and is a usability problem, so it is corrected here
+ * rather than reproduced.
+ *
+ * Kept in a separate file, loaded after index.css, so the original stylesheet
+ * stays byte-identical and this change is easy to find, audit, or revert.
+ *
+ * Budget that was being wasted on a 390x844 phone:
+ *   pb-32 (128px) + pt-6 (24px) + 5x space-y-6 (120px) + p-4 (32px)
+ */
+
+/* Reclaim the large bottom padding: the bottom nav is already outside the tab,
+   so pb-32 was double-reserving space that no longer needs reserving. */
+#tab-home {
+  padding-bottom: 0.5rem;
+  padding-top: 0.5rem;
+  row-gap: 0.5rem;
+}
+
+/* The 300px pen is the single biggest block. Shrinking it proportionally keeps
+   the artwork centred and full-width, and pulls the button into view. */
+#tab-home #sheep-pen {
+  width: 240px;
+  height: 240px;
+  margin-top: -2rem;
+}
+
+/* The scissors overlay is positioned in absolute pixels inside the pen, so it
+   has to be rescaled with it or it drifts off-centre. */
+#tab-home #scissors-img {
+  top: 64px;
+  left: 104px;
+  width: 64px;
+  height: 64px;
+}
+
+/* Tighten the yield card and status block slightly; a few pixels each adds up
+   without visibly changing the design. */
+#tab-home > .game-card {
+  padding: 0.9rem;
+}
+
+/* Guarantee the action row is reachable on short screens without scrolling to
+   the very bottom of the page. */
+#action-area {
+  padding-bottom: 0.25rem;
+}

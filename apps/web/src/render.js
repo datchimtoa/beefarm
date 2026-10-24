@@ -151,8 +151,11 @@ function renderMainAction(state, now) {
     btn.dataset.phase = 'start';
     stopShearEffect();
     $('scissors-img')?.classList.add('hidden');
-    // The original hides the timer/action cards until a shift exists.
-    $('normal-action-cards')?.classList.add('hidden');
+    // The SHEAR button lives INSIDE #normal-action-cards, so this container must
+    // stay visible in the idle state. The original only ever removed 'hidden'
+    // from it (inside the shift branches); hiding it here deleted the button and
+    // nothing could restore it.
+    $('normal-action-cards')?.classList.remove('hidden');
   } else if (ready) {
     if (bigTimer) bigTimer.textContent = t('status_ready');
     if (txt) txt.textContent = t('harvest_btn');
