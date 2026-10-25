@@ -5,6 +5,7 @@ import { createApp } from '../app.js';
 import { Economy } from '../lib/economy.js';
 import { MemoryStore } from '../lib/store-memory.js';
 import { signInitData } from '../lib/telegram.js';
+import { assertPlausibleYield, SHIFT_MIN } from './yield-helpers.js';
 
 const BOT = '424242:TEST';
 const USER = { id: 42, first_name: 'Mvp', username: 'mvp_user', language_code: 'en' };
@@ -82,14 +83,14 @@ test('full loop: shift -> harvest -> task -> me', async (t) => {
 
   const done = await post(base, '/api/harvest', { initData });
   assert.equal(done.body.phase, 'harvest');
-  assert.equal(done.body.wool, 182_351);
+  assertPlausibleYield(assert, done.body.wool, 'credited wool');
 
   const task = await post(base, '/api/claim_task', { initData, body: { taskId: 't1' } });
   assert.equal(task.status, 200);
-  assert.equal(task.body.wool, 187_351);
+  assert.equal(task.body.wool, done.body.wool + 5000);
 
   const me = await get(base, '/api/me', initData);
-  assert.equal(me.body.me.wool, 187_351);
+  assert.equal(me.body.me.wool, done.body.wool + 5000, 'harvest + task reward');
   assert.equal(me.body.config.minWithdraw, 4_500_000);
 });
 

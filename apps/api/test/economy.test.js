@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Economy, ERR, emptyUser } from '../lib/economy.js';
 import { MemoryStore } from '../lib/store-memory.js';
+import { assertPlausibleYield } from './yield-helpers.js';
 
 const BOT = '1:token';
 const WALLET = 'UQAbCdEfGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGHIJ'; // 48 chars: user-friendly + 46 base64
@@ -26,7 +27,7 @@ test('a shift cannot be double-credited', async () => {
   const { eco, advance } = makeEconomy();
   const start = await eco.harvest('42');
   assert.equal(start.phase, 'shift_started');
-  assert.equal(start.pendingWool, 182_351);
+  assertPlausibleYield(assert, start.pendingWool, 'pendingWool');
 
   const tooEarly = await eco.harvest('42');
   assert.equal(tooEarly.error, ERR.NOT_READY);
@@ -34,12 +35,12 @@ test('a shift cannot be double-credited', async () => {
   advance(3 * 60 * 1000);
   const done = await eco.harvest('42');
   assert.equal(done.phase, 'harvest');
-  assert.equal(done.wool, 182_351);
+  assertPlausibleYield(assert, done.wool, 'credited wool');
 
   // A second harvest with nothing pending must start a new shift, not pay again.
   const again = await eco.harvest('42');
   assert.equal(again.phase, 'shift_started');
-  assert.equal((await eco.user('42')).wool, 182_351);
+  assertPlausibleYield(assert, (await eco.user('42')).wool, 'stored wool');
 });
 
 test('task reward is paid once and requires membership', async () => {
@@ -88,7 +89,10 @@ test('withdrawal cap resets in the next settlement window', async () => {
 });
 
 test('admin config changes the economics live', async () => {
-  const { eco } = makeEconomy({ config: { woolPerShift: 10, minWithdraw: 1, rateTon: 10 } });
+  // A fixed range (min === max) makes the randomised yield deterministic here.
+  const { eco } = makeEconomy({
+    config: { woolPerShiftMin: 10, woolPerShiftMax: 10, minWithdraw: 1, rateTon: 10 },
+  });
   const start = await eco.harvest('7');
   assert.equal(start.pendingWool, 10);
 

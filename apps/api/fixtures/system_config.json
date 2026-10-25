@@ -2,6 +2,8 @@
   "system_config": {
     "shiftDurationMs": 180000,
     "woolPerShift": 182351,
+    "woolPerShiftMin": 165000,
+    "woolPerShiftMax": 198000,
     "refPercent": 10,
     "minWithdraw": 4500000,
     "rateTon": 450000000,

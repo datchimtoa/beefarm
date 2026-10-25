@@ -6,6 +6,7 @@ import { Economy } from '../lib/economy.js';
 import { MemoryStore } from '../lib/store-memory.js';
 import { signInitData } from '../lib/telegram.js';
 import { AdVerifier } from '../lib/ads.js';
+import { assertPlausibleYield } from './yield-helpers.js';
 
 const BOT = '424242:TEST';
 const AD_SECRET = 'ad-shared-secret';
@@ -76,7 +77,7 @@ test('full gated loop: postback -> shift -> harvest', async (t) => {
   clock += 3 * 60 * 1000;
   const done = await post(base, '/api/harvest', { initData });
   assert.equal(done.body.phase, 'harvest');
-  assert.equal(done.body.wool, 182_351);
+  assertPlausibleYield(assert, done.body.wool, 'credited wool');
 });
 
 test('a forged postback signature is rejected (400)', async (t) => {

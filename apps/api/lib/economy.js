@@ -12,7 +12,12 @@
 
 export const DEFAULT_CONFIG = {
   shiftDurationMs: 3 * 60 * 1000, // "3 mins", as advertised in the UI
-  woolPerShift: 182_351,          // matches the figure in the reference screenshots
+  // Per-shift yield. A range is used so every shift pays a slightly different
+  // amount: a single fixed number made the game feel rigged / machine-made.
+  // woolPerShift is still honoured as a fixed value if the range is absent.
+  woolPerShift: 182_351,
+  woolPerShiftMin: 165_000,
+  woolPerShiftMax: 198_000,
   refPercent: 10,                 // "Receive 10% of their produced wool"
   minWithdraw: 4_500_000,         // 0.01 GRAM at rateTon
   rateTon: 450_000_000,           // wool per GRAM
@@ -164,7 +169,7 @@ export class Economy {
       }
     }
 
-    user.pendingWool = config.woolPerShift;
+    user.pendingWool = this.#rollYield(config);
     user.workEndTime = now + config.shiftDurationMs;
     await this.#save(user);
     return { ok: true, phase: 'shift_started', workEndTime: user.workEndTime, pendingWool: user.pendingWool };
@@ -212,6 +217,39 @@ export class Economy {
     referrer.referrals += 1;
     await this.#save(referrer);
     return { ok: true };
+  }
+
+
+  /**
+   * Pick the wool a shift will pay.
+   *
+   * Server-side and per-shift: the client never sees or chooses the amount, so
+   * it cannot be influenced, and the player sees natural variation instead of
+   * the same number every time (which reads as fake).
+   *
+   * Rounded to the nearest 100 so values look like real yields (182,300) rather
+   * than a random-looking 182,337.
+   *
+   * @param {object} config
+   * @returns {number} whole wool
+   */
+  #rollYield(config) {
+    const min = Number(config.woolPerShiftMin);
+    const max = Number(config.woolPerShiftMax);
+
+    // No range configured: honour the legacy fixed value.
+    // min === max is a legitimate fixed range (useful for tests and for admins
+    // who want a constant payout), so it must NOT fall through.
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
+      return Math.max(0, Math.floor(Number(config.woolPerShift) || 0));
+    }
+
+    const span = max - min;
+    const rolled = min + Math.random() * span;
+    // Round to hundreds, but never below the configured minimum (a small range
+    // such as 10-10 would otherwise round down to 0).
+    const rounded = Math.round(rolled / 100) * 100;
+    return Math.max(Math.ceil(min), rounded);
   }
 
   /**
