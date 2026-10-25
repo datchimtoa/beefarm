@@ -98,4 +98,10 @@ export class FirebaseStore {
     const snap = await db.ref('system_config').get();
     return snap.exists() ? snap.val() : {};
   }
+
+  /** Merge keys into system_config, leaving the others untouched. */
+  async putConfig(patch) {
+    const db = await this.#database();
+    await db.ref('system_config').update(patch);
+  }
 }

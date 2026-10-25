@@ -53,4 +53,9 @@ export class MemoryStore {
   async getConfig() {
     return this.config;
   }
+
+  /** Merge keys into the config, matching FirebaseStore.putConfig. */
+  async putConfig(patch) {
+    this.config = { ...this.config, ...patch };
+  }
 }
