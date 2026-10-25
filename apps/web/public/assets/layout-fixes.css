@@ -48,3 +48,63 @@
 #action-area {
   padding-bottom: 0.25rem;
 }
+
+/* ------------------------------------------------------------------ *
+ * Bee-themed loading indicator
+ *
+ * The original loader used a flat yellow progress bar over a bouncing logo.
+ * For the bee skin the bar becomes a honey fill with a slow amber glow, and
+ * the logo bobs with a subtle wing-flick instead of a hard bounce.
+ *
+ * Kept here (not in index.css) so the original stylesheet stays byte-identical
+ * and this is trivial to revert.
+ * ------------------------------------------------------------------ */
+
+#initial-loader {
+  background: radial-gradient(circle at 50% 30%, #fff6d6, #f5f9c0 70%);
+}
+
+/* Logo: gentle float, no hard bounce. */
+#initial-loader .loader-logo {
+  animation: beeFloat 2.2s ease-in-out infinite alternate;
+  box-shadow: 0 6px #5f270a, 0 0 0 6px rgba(255, 214, 89, 0.35);
+}
+
+@keyframes beeFloat {
+  from { transform: translateY(0) rotate(-1.5deg); }
+  to   { transform: translateY(-8px) rotate(1.5deg); }
+}
+
+/* Progress track: warmer, with a honey rim. */
+#initial-loader .progress-container {
+  border-color: #8b5a2b;
+  background-color: #fff6d6;
+  box-shadow: inset 0 3px 6px rgba(139, 90, 43, 0.25);
+}
+
+/* Fill: honey gradient with a slow shimmer so progress feels alive. */
+#initial-loader .progress-bar {
+  background: linear-gradient(90deg, #f4b400, #ffd659 45%, #ffb400 75%, #f4b400);
+  background-size: 220% 100%;
+  box-shadow: 0 0 10px rgba(244, 180, 0, 0.65);
+  animation: honeyFlow 2.4s linear infinite;
+}
+
+@keyframes honeyFlow {
+  from { background-position: 0% 50%; }
+  to   { background-position: 220% 50%; }
+}
+
+/* Loading caption: warm brown, slightly tighter. */
+#initial-loader .progress-text {
+  color: #8b5a2b;
+  letter-spacing: 0.3px;
+}
+
+/* Respect reduced-motion: keep the loader informative, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  #initial-loader .loader-logo,
+  #initial-loader .progress-bar {
+    animation: none;
+  }
+}

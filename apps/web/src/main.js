@@ -23,9 +23,11 @@ import LANGUAGES from './languages.json';
 import { spawnWoolReward } from './effects.js';
 import { bindConnectionWatcher } from './connection.js';
 
+// Task list. The ids must match DEFAULT_CONFIG.tasks on the server, which is
+// what actually validates a claim; the labels here are display only.
 const TASKS = [
-  { id: 't1', channel: 'Lucky Sheep Farm Channel', reward: 5_000, type: 'channel' },
-  { id: 't2', channel: 'Lucky Sheep Farm Chat', reward: 5_000, type: 'chat' },
+  { id: 't1', channel: 'Lucky Bee Farm Channel', reward: 5_000, type: 'channel' },
+  { id: 't2', channel: 'Lucky Bee Farm Chat', reward: 5_000, type: 'chat' },
   { id: 't3', channel: 'Bee Farm Channel', reward: 5_000, type: 'channel' },
   { id: 't4', channel: 'Bee Farm Chat', reward: 5_000, type: 'chat' },
 ];
@@ -339,7 +341,9 @@ function start({ webApp, user }) {
   }
 
   function bindReferral() {
-    const bot = import.meta.env?.VITE_BOT_USERNAME ?? 'LuckySheepFarm_bot';
+    // Referral link. Must be your own bot; the sheep-era default would credit
+    // the original game instead. Set VITE_BOT_USERNAME at build time.
+    const bot = import.meta.env?.VITE_BOT_USERNAME ?? 'LuckyBeeFarm_bot';
     const link = `https://t.me/${bot}?start=ref_${user.id}`;
     const display = el('ref-link-display');
     if (display) display.textContent = link;
