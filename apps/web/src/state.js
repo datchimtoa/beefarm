@@ -5,10 +5,10 @@
 // from state rather than each handler poking the DOM.
 
 export const DEFAULTS = {
-  wool: 0,
-  pendingWool: 0,
-  workEndTime: 0,
-  refEarnedWool: 0,
+  balance: 0,
+  pendingYield: 0,
+  runEndTime: 0,
+  refEarned: 0,
   referrals: 0,
   completedTasks: [],
   withdrawHistory: [],
@@ -46,13 +46,13 @@ export function createStore(initial = {}) {
   };
 }
 
-/** Format wool the way the original did: Intl grouping, no decimals. */
+/** Format balance the way the original did: Intl grouping, no decimals. */
 export function formatNumber(value) {
   return new Intl.NumberFormat('en-US').format(Math.floor(Number(value) || 0));
 }
 
-/** wool -> GRAM string, matching the original's 2dp display. */
-export function toGram(wool, rateTon) {
+/** balance -> GRAM string, matching the original's 2dp display. */
+export function toGram(balance, rateTon) {
   if (!rateTon) return '0.00';
-  return (Number(wool || 0) / Number(rateTon)).toFixed(2);
+  return (Number(balance || 0) / Number(rateTon)).toFixed(2);
 }

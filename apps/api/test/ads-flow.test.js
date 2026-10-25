@@ -77,7 +77,7 @@ test('full gated loop: postback -> shift -> harvest', async (t) => {
   clock += 3 * 60 * 1000;
   const done = await post(base, '/api/harvest', { initData });
   assert.equal(done.body.phase, 'harvest');
-  assertPlausibleYield(assert, done.body.wool, 'credited wool');
+  assertPlausibleYield(assert, done.body.balance, 'credited balance');
 });
 
 test('a forged postback signature is rejected (400)', async (t) => {

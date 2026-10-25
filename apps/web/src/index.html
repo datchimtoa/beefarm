@@ -57,8 +57,8 @@
             <div class="flex items-center gap-2">
                 <div class="flex gap-2 bg-[#FFE8A1] px-3 py-1.5 rounded-full border-2 border-[#8B5A2B] shadow-[0_2px_0_#8B5A2B]">
                    <div class="flex items-center gap-1">
-                     <img src="/wool.png" class="w-5 h-7 object-contain" alt="Honey">
-                     <span class="val-wool font-black text-[#5F270A] text-xl tabular-nums">0</span>
+                     <img src="/currency.png" class="w-5 h-7 object-contain" alt="Honey">
+                     <span class="val-balance font-black text-[#5F270A] text-xl tabular-nums">0</span>
                    </div>
                 </div>
             </div>
@@ -76,12 +76,12 @@
                     </p>
                     
                     <div class="flex justify-center items-center gap-2">
-                        <span id="val-pendingWool"
+                        <span id="val-pendingYield"
                               class="text-4xl font-black text-[#5F270A] tabular-nums">
                             0
                         </span>
                     
-                        <img src="/wool.png" class="w-6 h-8">
+                        <img src="/currency.png" class="w-6 h-8">
                     </div>
                     
                     <p class="mt-2 text-xs font-black text-[#8B5A2B] lang-txt" data-key="yield_desc">
@@ -99,15 +99,15 @@
                   </div>
                 </div>
           
-                <div id="sheep-pen" class="relative w-[300px] h-[300px] mx-auto -mt-16 flex-shrink-0 z-10 pointer-events-none">
+                <div id="mascot-pen" class="relative w-[300px] h-[300px] mx-auto -mt-16 flex-shrink-0 z-10 pointer-events-none">
                   
-                  <img id="sheep-img" class="absolute top-0 left-0 w-full h-full z-20 pointer-events-none drop-shadow-xl max-w-none transition-opacity duration-300"
-                       src="/sheep.png" alt="Bee">
+                  <img id="mascot-img" class="absolute top-0 left-0 w-full h-full z-20 pointer-events-none drop-shadow-xl max-w-none transition-opacity duration-300"
+                       src="/mascot.png" alt="Bee">
                   
                   <img id="scissors-img" class="absolute top-[80px] left-[130px] w-[80px] h-[80px] z-30 pointer-events-none hidden drop-shadow-md" 
                        src="/scissors.gif" alt="Honey">
                   
-                  <div id="wool-particles" class="absolute inset-0 z-40 pointer-events-none"></div>
+                  <div id="yield-particles" class="absolute inset-0 z-40 pointer-events-none"></div>
                 </div>
           
                 <div class="w-full min-h-[80px] px-8 relative z-20" id="action-area">
@@ -141,7 +141,7 @@
                   </div>
                   <h3 class="text-lg font-black text-[#5F270A] mb-2 uppercase lang-txt" data-key="ref_share">Share Invite Link</h3>
                   <div class="bg-white border-2 border-[#D4A373] p-3 rounded-xl flex items-center justify-between mb-4 overflow-hidden shadow-inner">
-                    <span id="ref-link-display" class="text-[#8B5A2B] text-xs font-bold truncate mr-2">https://t.me/HappySheepFarm_bot?start=0</span>
+                    <span id="ref-link-display" class="text-[#8B5A2B] text-xs font-bold truncate mr-2">https://t.me/HappyMascotFarm_bot?start=0</span>
                     <button id="btn-copy-ref-icon" class="text-[#5F270A] p-2 bg-[#FFE8A1] rounded-lg border border-[#D4A373] hover:bg-[#FFD659] transition-colors"><i data-lucide="copy" class="w-4 h-4"></i></button>
                   </div>
                   
@@ -150,10 +150,10 @@
                     <span class="text-xl font-black text-white text-stroke-brown tabular-nums drop-shadow-sm" id="val-referrals">0</span>
                   </div>
                   <div class="flex justify-between items-center mb-4 px-2">
-                    <span class="text-xs font-black text-[#8B5A2B] uppercase lang-txt" data-key="ref_earned_total">Total earned wool:</span>
+                    <span class="text-xs font-black text-[#8B5A2B] uppercase lang-txt" data-key="ref_earned_total">Total earned balance:</span>
                     <div class="flex items-center gap-1.5 text-xl font-black text-white text-stroke-brown tabular-nums drop-shadow-sm">
-                        <span id="val-refEarnedWool">0</span>
-                        <img src="/wool.png" class="w-4 h-5 object-contain" alt="Honey">
+                        <span id="val-refEarned">0</span>
+                        <img src="/currency.png" class="w-4 h-5 object-contain" alt="Honey">
                     </div>
                   </div>
 
@@ -163,7 +163,7 @@
                   <div class="text-left bg-[#FFE8A1] border border-[#D4A373] rounded-xl p-3">
                     <p class="text-xs text-[#8B5A2B] mb-2 font-black uppercase lang-txt" data-key="ref_reward_title">Reward for each invite:</p>
                     <p class="text-sm font-black text-[#5F270A] flex items-center gap-2 tabular-nums">
-                        <img src="/wool.png" class="w-3.5 h-5 object-contain"> <span class="lang-txt" data-key="ref_reward_val">Receive 10% of their wool</span>
+                        <img src="/currency.png" class="w-3.5 h-5 object-contain"> <span class="lang-txt" data-key="ref_reward_val">Receive 10% of their honey</span>
                     </p>
                   </div>
                 </div>
@@ -171,7 +171,7 @@
 
             <div id="tab-withdraw" class="tab-content hidden-tab p-6 space-y-6 animate-fade-in pb-24">
                 <h2 class="text-2xl font-black text-white text-stroke-brown mb-4 flex items-center gap-2">
-                    <i data-lucide="truck" class="text-[#5F270A] w-6 h-6 stroke-[3]"></i> <span class="lang-txt" data-key="withdraw_title">Sell Wool (GRAM)</span>
+                    <i data-lucide="truck" class="text-[#5F270A] w-6 h-6 stroke-[3]"></i> <span class="lang-txt" data-key="withdraw_title">Sell Balance (GRAM)</span>
                 </h2>
                 
                 <div id="withdraw-form-container" class="game-card p-5">
@@ -186,12 +186,12 @@
                     </div>
 
                     <div class="pt-3 border-t-2 border-[#D4A373]">
-                      <label class="text-[10px] font-black uppercase text-[#8B5A2B] mb-1 block lang-txt" data-key="withdraw_wool_amount">Amount of Wool to Sell</label>
+                      <label class="text-[10px] font-black uppercase text-[#8B5A2B] mb-1 block lang-txt" data-key="withdraw_amount">Amount of Balance to Sell</label>
                       <div class="relative">
-                        <input type="number" id="input-withdraw" placeholder="0" class="w-full bg-white border-2 border-[#D4A373] rounded-xl p-3 text-[#97BA42] focus:outline-none focus:border-[#97BA42] font-black font-mono text-lg tabular-nums shadow-inner placeholder-[#D4A373]"/>
+                        <input type="number" id="input-withdraw" placeholder="0" class="w-full bg-white border-2 border-[#D4A373] rounded-xl p-3 text-[#C97D00] focus:outline-none focus:border-[#C97D00] font-black font-mono text-lg tabular-nums shadow-inner placeholder-[#D4A373]"/>
                         <button id="btn-max-withdraw" class="absolute right-2 top-3 text-[10px] bg-[#8B5A2B] hover:bg-[#5F270A] text-white px-3 py-1.5 rounded-lg font-bold transition-colors lang-txt" data-key="exchange_max">ALL</button>
                       </div>
-                      <p class="text-[10px] text-[#8B5A2B] font-bold mt-1 tabular-nums lang-txt" data-key="withdraw_min">* Minimum: 4,500,000 Wool = 0.01 GRAM</p>
+                      <p class="text-[10px] text-[#8B5A2B] font-bold mt-1 tabular-nums lang-txt" data-key="withdraw_min">* Minimum: 4,500,000 Balance = 0.01 GRAM</p>
                       
                       <div class="flex justify-between items-center mt-3 bg-[#FFE8A1] p-3 rounded-xl border border-[#D4A373]">
                         <span class="text-xs text-[#8B5A2B] font-black uppercase lang-txt" data-key="withdraw_receive">You will receive:</span>
@@ -208,9 +208,9 @@
                     <div class="relative w-24 h-24 bg-[#FFE8A1] border-4 border-[#8B5A2B] rounded-full flex items-center justify-center mx-auto shadow-md">
                         <i data-lucide="truck" class="text-[#8B5A2B] w-12 h-12 animate-bounce"></i>
                     </div>
-                    <h3 class="text-lg font-black text-[#5F270A] uppercase tracking-wide lang-txt" data-key="withdraw_waiting_truck">WOOL TRUCK IS ON THE WAY</h3>
+                    <h3 class="text-lg font-black text-[#5F270A] uppercase tracking-wide lang-txt" data-key="withdraw_waiting_truck">HONEY TRUCK IS ON THE WAY</h3>
                     <p class="text-xs text-[#8B5A2B] font-bold px-2 leading-relaxed lang-txt" data-key="withdraw_waiting_desc">
-                        Your wool shipment is registered. The wool truck automatically pays TON out at 15:00 daily.
+                        Your balance shipment is registered. The balance truck automatically pays TON out at 15:00 daily.
                     </p>
                     <div id="truck-timer-box" class="bg-white border-2 border-[#D4A373] py-3 rounded-2xl shadow-inner max-w-[200px] mx-auto">
                         <p class="text-[9px] font-black text-[#8B5A2B] uppercase tracking-wider mb-1 lang-txt" data-key="withdraw_timer_label">Time until payout</p>
@@ -235,7 +235,7 @@
 
         <nav class="absolute bottom-0 w-full bg-[#FFFBE6] border-t-2 border-[#8B5A2B] flex justify-around items-center pb-safe pt-2 px-1 z-20 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
             <button class="nav-btn active-nav flex flex-col items-center justify-center p-2 space-y-1 w-1/5 transition-colors text-[#5F270A]" data-target="tab-home">
-                <i data-lucide="tent" class="w-6 h-6 nav-icon text-[#97BA42] drop-shadow-[0_2px_0_#5F270A] fill-current"></i>
+                <i data-lucide="tent" class="w-6 h-6 nav-icon text-[#C97D00] drop-shadow-[0_2px_0_#5F270A] fill-current"></i>
                 <span class="text-[9px] font-black tracking-wider uppercase lang-txt" data-key="tab_farm">Farm</span>
             </button>
             <button class="nav-btn flex flex-col items-center justify-center p-2 space-y-1 w-1/5 transition-colors text-[#D4A373] hover:text-[#8B5A2B]" data-target="tab-tasks">
@@ -248,7 +248,7 @@
             </button>
             <button class="nav-btn flex flex-col items-center justify-center p-2 space-y-1 w-1/5 transition-colors text-[#D4A373] hover:text-[#8B5A2B]" data-target="tab-withdraw">
                 <i data-lucide="landmark" class="w-6 h-6 nav-icon"></i>
-                <span class="text-[9px] font-black tracking-wider uppercase lang-txt" data-key="tab_withdraw">Sell Wool</span>
+                <span class="text-[9px] font-black tracking-wider uppercase lang-txt" data-key="tab_withdraw">Sell Balance</span>
             </button>
         </nav>
         
@@ -268,7 +268,7 @@
                 <div class="space-y-6">
                     <div class="setting-group-container flex items-center justify-between">
                         <span class="font-black text-[#5F270A] text-sm lang-txt" data-key="music">Game Audio</span>
-                        <button id="toggle-audio-btn" class="w-14 h-8 bg-[#97BA42] border-2 border-[#5F270A] rounded-full p-1 relative transition-colors focus:outline-none shadow-sm">
+                        <button id="toggle-audio-btn" class="w-14 h-8 bg-[#C97D00] border-2 border-[#5F270A] rounded-full p-1 relative transition-colors focus:outline-none shadow-sm">
                             <span class="block w-5 h-5 bg-white border border-[#5F270A] rounded-full transition-transform transform translate-x-6 animate-none shadow-sm" id="audio-switch-dot"></span>
                         </button>
                     </div>
@@ -313,7 +313,7 @@
     </div>
   <div id="fatal-error" style="display:none;position:fixed;inset:0;z-index:10000;background:#FFFBE6;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;">
     <p style="font-family:Nunito,sans-serif;font-weight:900;color:#5F270A;font-size:1.05rem;line-height:1.5;" data-fatal-text>Something went wrong.</p>
-    <button onclick="location.reload()" style="margin-top:1.5rem;padding:.75rem 1.5rem;border-radius:1rem;border:2px solid #5F270A;background:#9DFB6E;font-family:Nunito,sans-serif;font-weight:900;color:#5F270A;">Retry</button>
+    <button onclick="location.reload()" style="margin-top:1.5rem;padding:.75rem 1.5rem;border-radius:1rem;border:2px solid #5F270A;background:#FFD659;font-family:Nunito,sans-serif;font-weight:900;color:#5F270A;">Retry</button>
   </div>
 </body>
 </html>

@@ -38,6 +38,7 @@ try {
 }
 
 const { system_config: seed } = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+const argv = process.argv.slice(2);
 const store = new FirebaseStore({ databaseUrl: DB_URL, serviceAccount });
 
 console.log(`database : ${DB_URL}`);
@@ -56,7 +57,21 @@ if (mismatched.length) {
 const before = await store.getConfig();
 console.log(`live     : ${Object.keys(before).length} keys before`);
 
+// Remove keys the fixture no longer declares. Without this the database keeps
+// stale entries from earlier schemas (woolPerShift*, shiftDurationMs) and the
+// console misrepresents what the server actually reads.
+const prune = argv.includes('--prune');
+const stale = Object.keys(before).filter((k) => !(k in seed));
+
 await store.putConfig(seed);
+
+if (prune && stale.length) {
+  await store.putConfig(Object.fromEntries(stale.map((k) => [k, null])));
+  console.log(`\n  pruned ${stale.length} stale key(s): ${stale.join(', ')}`);
+} else if (stale.length) {
+  console.log(`\n  note: ${stale.length} stale key(s) still present: ${stale.join(', ')}`);
+  console.log('        re-run with --prune to remove them');
+}
 
 const after = await store.getConfig();
 console.log(`live     : ${Object.keys(after).length} keys after\n`);

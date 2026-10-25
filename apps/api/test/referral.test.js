@@ -22,7 +22,7 @@ async function seedPair(opts = {}) {
   return { eco, store, advance };
 }
 
-test('harvesting pays the referrer 10% of the credited wool', async () => {
+test('harvesting pays the referrer 10% of the credited balance', async () => {
   const { eco, store, advance } = await seedPair();
 
   await eco.harvest('2');
@@ -33,11 +33,11 @@ test('harvesting pays the referrer 10% of the credited wool', async () => {
   assert.deepEqual(done.referral, { referrerId: '1', bonus: expected });
 
   const referrer = await store.getUser('1');
-  assert.equal(referrer.wool, expected);
-  assert.equal(referrer.refEarnedWool, expected);
+  assert.equal(referrer.balance, expected);
+  assert.equal(referrer.refEarned, expected);
 
   const referee = await store.getUser('2');
-  assert.equal(referee.wool, done.credited, 'referee keeps the full amount');
+  assert.equal(referee.balance, done.credited, 'referee keeps the full amount');
 });
 
 test('the referrer is paid again on each subsequent harvest', async () => {
@@ -54,8 +54,8 @@ test('the referrer is paid again on each subsequent harvest', async () => {
 
   const referrer = await store.getUser('1');
   assert.ok(expected > 0, 'no bonuses were paid');
-  assert.equal(referrer.refEarnedWool, expected);
-  assert.equal(referrer.wool, expected);
+  assert.equal(referrer.refEarned, expected);
+  assert.equal(referrer.balance, expected);
 });
 
 test('no referral is paid when the player has no referrer', async () => {
@@ -78,8 +78,8 @@ test('a banned referrer earns nothing, but the referee still harvests', async ()
   const done = await eco.harvest('2');
 
   assert.equal(done.referral, null);
-  assert.ok(done.wool > 0, 'referee is unaffected');
-  assert.equal((await store.getUser('1')).wool, 0);
+  assert.ok(done.balance > 0, 'referee is unaffected');
+  assert.equal((await store.getUser('1')).balance, 0);
 });
 
 test('refPercent is honoured from live config, including 0', async () => {
@@ -87,7 +87,7 @@ test('refPercent is honoured from live config, including 0', async () => {
   await zero.eco.harvest('2');
   zero.advance(3 * 60 * 1000);
   assert.equal((await zero.eco.harvest('2')).referral, null);
-  assert.equal((await zero.store.getUser('1')).wool, 0);
+  assert.equal((await zero.store.getUser('1')).balance, 0);
 
   const twenty = await seedPair({ config: { refPercent: 20 } });
   await twenty.eco.harvest('2');
@@ -107,7 +107,7 @@ test('a self-referral never pays out', async () => {
   advance(3 * 60 * 1000);
   const done = await eco.harvest('5');
   assert.equal(done.referral, null);
-  assert.ok(done.wool > 0, 'no self-bonus added');
+  assert.ok(done.balance > 0, 'no self-bonus added');
 });
 
 test('the referral link is recorded only once', async () => {
@@ -153,6 +153,6 @@ test('REGRESSION: concurrent harvests do not lose referral payouts', async () =>
   const expected = results.reduce((sum, r) => sum + (r.referral ? r.referral.bonus : 0), 0);
   assert.ok(expected > 0, 'no referral bonuses were paid at all');
   const referrer = await store.getUser('1');
-  assert.equal(referrer.wool, expected, 'no lost updates');
-  assert.equal(referrer.refEarnedWool, expected);
+  assert.equal(referrer.balance, expected, 'no lost updates');
+  assert.equal(referrer.refEarned, expected);
 });

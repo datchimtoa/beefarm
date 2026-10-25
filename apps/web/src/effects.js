@@ -3,9 +3,9 @@
 // The original had two effects our rebuild was missing, and they are the reason
 // the game felt static:
 //
-//   1. `+182,351 🐑` floats up from wherever the harvest happened
+//   1. `+182,351 🍯` floats up from wherever the collection happened
 //      (class `wool-particle`, keyframe `floatUp`, 1.5s)
-//   2. small crescent "wool strands" fly out of the sheep during a shift
+//   2. small crescent "honey strands" fly out of the mascot during a run
 //      (class `crescent-strand`, keyframe `flyOutStrand`, 0.9s)
 //
 // Both keyframes and both classes already exist in the byte-identical
@@ -15,17 +15,17 @@ const MAX_PARTICLES = 40;
 
 /**
  * Floating "+N" text at the harvest point.
- * Mirrors the original: appended to #wool-particles, removed after 1.5s.
+ * Mirrors the original: appended to #yield-particles, removed after 1.5s.
  *
  * @param {HTMLElement | null} host
  * @param {string} label already-formatted amount, e.g. "182,351"
  */
-export function spawnWoolReward(host, label) {
+export function spawnYieldReward(host, label) {
   if (!host) return;
   const el = document.createElement('div');
   el.className =
     'absolute text-white font-black text-2xl wool-particle flex items-center text-stroke-brown tracking-wide z-50';
-  el.innerHTML = `+${label}<img src="/wool.png" class="w-6 h-8 ml-2 object-contain drop-shadow-md">`;
+  el.innerHTML = `+${label}<img src="/currency.png" class="w-6 h-8 ml-2 object-contain drop-shadow-md">`;
   host.appendChild(el);
   setTimeout(() => {
     if (el.parentNode === host) host.removeChild(el);
@@ -63,7 +63,7 @@ function spawnStrand(host) {
  * The original spawned 1–3 strands at most every 90ms via requestAnimationFrame;
  * a plain interval is equivalent here and cheaper.
  *
- * @param {HTMLElement | null} host  #wool-particles
+ * @param {HTMLElement | null} host  #yield-particles
  */
 export function startShearEffect(host) {
   if (!host || strandTimer) return;

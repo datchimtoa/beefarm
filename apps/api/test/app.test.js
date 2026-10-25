@@ -83,14 +83,14 @@ test('full loop: shift -> harvest -> task -> me', async (t) => {
 
   const done = await post(base, '/api/harvest', { initData });
   assert.equal(done.body.phase, 'harvest');
-  assertPlausibleYield(assert, done.body.wool, 'credited wool');
+  assertPlausibleYield(assert, done.body.balance, 'credited balance');
 
   const task = await post(base, '/api/claim_task', { initData, body: { taskId: 't1' } });
   assert.equal(task.status, 200);
-  assert.equal(task.body.wool, done.body.wool + 5000);
+  assert.equal(task.body.balance, done.body.balance + 5000);
 
   const me = await get(base, '/api/me', initData);
-  assert.equal(me.body.me.wool, done.body.wool + 5000, 'harvest + task reward');
+  assert.equal(me.body.me.balance, done.body.balance + 5000, 'harvest + task reward');
   assert.equal(me.body.config.minWithdraw, 4_500_000);
 });
 
@@ -103,15 +103,15 @@ test('withdrawal is rejected for a non-member-only flow but works when funded', 
     initData,
     body: { wallet: WALLET, amount: 4_500_000 },
   });
-  assert.equal(poor.body.errorCode, 'insufficient_wool');
+  assert.equal(poor.body.errorCode, 'insufficient_balance');
 
   // Simulate a funded account (in production this comes from real shifts).
   const u = await store.getUser('42');
-  await store.putUser({ ...(u ?? { telegramId: '42' }), wool: 5_000_000, completedTasks: [], withdrawHistory: [] });
+  await store.putUser({ ...(u ?? { telegramId: '42' }), balance: 5_000_000, completedTasks: [], withdrawHistory: [] });
 
   const ok = await post(base, '/api/withdraw', { initData, body: { wallet: WALLET, amount: 4_500_000 } });
   assert.equal(ok.status, 200);
-  assert.equal(ok.body.wool, 500_000);
+  assert.equal(ok.body.balance, 500_000);
 });
 
 test('task claim requires membership', async (t) => {

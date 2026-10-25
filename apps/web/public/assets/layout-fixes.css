@@ -22,7 +22,7 @@
 
 /* The 300px pen is the single biggest block. Shrinking it proportionally keeps
    the artwork centred and full-width, and pulls the button into view. */
-#tab-home #sheep-pen {
+#tab-home #mascot-pen {
   width: 240px;
   height: 240px;
   margin-top: -2rem;
@@ -107,4 +107,38 @@
   #initial-loader .progress-bar {
     animation: none;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Loading-screen logo
+ *
+ * The uploaded logo is a JPEG: a circular badge inside an 800x800 white
+ * square, so it cannot carry transparency. Inside the original's rounded-square
+ * container with a yellow gradient behind it, those white corners showed up as
+ * hard, wobbling edges.
+ *
+ * Fixed by cropping the artwork to its own circle instead of trying to remove
+ * the corners: the badge is already round, so a circular mask cuts exactly the
+ * white band and nothing else. No image processing, no re-export, and it
+ * survives any future square logo that is round inside.
+ * ------------------------------------------------------------------ */
+
+#initial-loader .loader-logo {
+  width: 96px;
+  height: 96px;
+  padding: 0;
+  border-radius: 50%;          /* was 24px: a rounded square */
+  background: transparent;     /* the gradient behind exposed the white corners */
+  border: 4px solid #5f270a;
+  overflow: hidden;
+  box-shadow: 0 6px #5f270a, 0 0 0 5px rgba(255, 214, 89, 0.45);
+}
+
+#initial-loader .loader-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
+  transform: scale(1.06);      /* trims the ~20px white band to the gold ring */
 }

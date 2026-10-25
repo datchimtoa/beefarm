@@ -1,31 +1,31 @@
 // Server-authoritative game economy.
 //
-// The client is never trusted for: current time, wool owed, shift length,
+// The client is never trusted for: current time, balance owed, shift length,
 // withdrawal eligibility, or payout status. Every rule below runs here.
 //
 // Money-relevant invariants enforced in this module:
 //   - a user can run at most one shift at a time            (startShift)
-//   - wool is only credited once per completed shift        (harvest)
+//   - balance is only credited once per completed shift        (harvest)
 //   - a task reward is paid at most once                    (claimTask)
 //   - at most one withdrawal request per settlement window  (requestWithdraw)
 //   - withdrawals are validated against live config         (requestWithdraw)
 
 export const DEFAULT_CONFIG = {
-  shiftDurationMs: 3 * 60 * 1000, // "3 mins", as advertised in the UI
+  runDurationMs: 3 * 60 * 1000, // "3 mins", as advertised in the UI
   // Per-shift yield. A range is used so every shift pays a slightly different
   // amount: a single fixed number made the game feel rigged / machine-made.
-  // woolPerShift is still honoured as a fixed value if the range is absent.
-  woolPerShift: 182_351,
-  woolPerShiftMin: 165_000,
-  woolPerShiftMax: 198_000,
-  refPercent: 10,                 // "Receive 10% of their produced wool"
+  // yieldPerRun is still honoured as a fixed value if the range is absent.
+  yieldPerRun: 182_351,
+  yieldPerRunMin: 165_000,
+  yieldPerRunMax: 198_000,
+  refPercent: 10,                 // "Receive 10% of their produced balance"
   minWithdraw: 4_500_000,         // 0.01 GRAM at rateTon
-  rateTon: 450_000_000,           // wool per GRAM
+  rateTon: 450_000_000,           // balance per GRAM
   settlementHourUtc: 8,           // daily payout tick (UTC)
   maxWithdrawsPerDay: 1,          // admin-controlled
   tasks: [
-    { id: 't1', reward: 5_000, channel: '@LuckySheepFarm_channel' },
-    { id: 't2', reward: 5_000, channel: '@LuckySheepFarm_chat' },
+    { id: 't1', reward: 5_000, channel: '@LuckyMascotFarm_channel' },
+    { id: 't2', reward: 5_000, channel: '@LuckyMascotFarm_chat' },
     { id: 't3', reward: 5_000, channel: '@HappyCowFarm_channel' },
     { id: 't4', reward: 5_000, channel: '@HappyCowFarm_chat' },
   ],
@@ -40,7 +40,7 @@ export const ERR = {
   NOT_MEMBER: 'not_member',
   INVALID_AMOUNT: 'invalid_amount',
   INVALID_WALLET: 'invalid_wallet',
-  INSUFFICIENT_WOOL: 'insufficient_wool',
+  INSUFFICIENT_BALANCE: 'insufficient_balance',
   MIN_WITHDRAW: 'min_withdraw_error',
   DAILY_LIMIT: 'daily_limit_reached',
   AD_REQUIRED: 'ad_required',
@@ -52,10 +52,10 @@ const TON_ADDRESS_RE = /^(?:-?\d+:[0-9a-fA-F]{64}|[EU]Q[A-Za-z0-9_-]{46})$/;
 export function emptyUser(telegramId, now) {
   return {
     telegramId: String(telegramId),
-    wool: 0,
-    pendingWool: 0,
-    workEndTime: 0,
-    refEarnedWool: 0,
+    balance: 0,
+    pendingYield: 0,
+    runEndTime: 0,
+    refEarned: 0,
     referrals: 0,
     completedTasks: [],
     withdrawHistory: [],
@@ -116,10 +116,10 @@ export class Economy {
   /** Public view of a user; hides internal fields. */
   static view(user, config) {
     return {
-      wool: user.wool ?? 0,
-      pendingWool: user.pendingWool ?? 0,
-      workEndTime: user.workEndTime ?? 0,
-      refEarnedWool: user.refEarnedWool ?? 0,
+      balance: user.balance ?? 0,
+      pendingYield: user.pendingYield ?? 0,
+      runEndTime: user.runEndTime ?? 0,
+      refEarned: user.refEarned ?? 0,
       referrals: user.referrals ?? 0,
       // Records created by an older schema may lack these; always send arrays
       // so the client can render without null guards everywhere.
@@ -144,20 +144,20 @@ export class Economy {
     if (user.banned) return { error: ERR.BANNED };
     const now = this.now();
 
-    if (user.pendingWool > 0) {
-      if (now < user.workEndTime) {
-        return { error: ERR.NOT_READY, retryAfterMs: user.workEndTime - now };
+    if (user.pendingYield > 0) {
+      if (now < user.runEndTime) {
+        return { error: ERR.NOT_READY, retryAfterMs: user.runEndTime - now };
       }
-      const credited = user.pendingWool;
-      user.wool += credited;
-      user.pendingWool = 0;
-      user.workEndTime = 0;
+      const credited = user.pendingYield;
+      user.balance += credited;
+      user.pendingYield = 0;
+      user.runEndTime = 0;
       await this.#save(user);
 
       // Pay the referrer a cut of what this referee actually produced.
       const referral = await this.#payReferral(user, credited, config);
 
-      return { ok: true, phase: 'harvest', credited, wool: user.wool, referral };
+      return { ok: true, phase: 'harvest', credited, balance: user.balance, referral };
     }
 
     // Starting a new shift requires a verified ad. Collecting an already
@@ -169,10 +169,10 @@ export class Economy {
       }
     }
 
-    user.pendingWool = this.#rollYield(config);
-    user.workEndTime = now + config.shiftDurationMs;
+    user.pendingYield = this.#rollYield(config);
+    user.runEndTime = now + config.runDurationMs;
     await this.#save(user);
-    return { ok: true, phase: 'shift_started', workEndTime: user.workEndTime, pendingWool: user.pendingWool };
+    return { ok: true, phase: 'shift_started', runEndTime: user.runEndTime, pendingYield: user.pendingYield };
   }
 
   /**
@@ -195,9 +195,9 @@ export class Economy {
     if (!member) return { error: ERR.NOT_MEMBER, channel: task.channel };
 
     user.completedTasks.push(taskId);
-    user.wool += task.reward;
+    user.balance += task.reward;
     await this.#save(user);
-    return { ok: true, reward: task.reward, wool: user.wool };
+    return { ok: true, reward: task.reward, balance: user.balance };
   }
 
   /**
@@ -221,7 +221,7 @@ export class Economy {
 
 
   /**
-   * Pick the wool a shift will pay.
+   * Pick the balance a shift will pay.
    *
    * Server-side and per-shift: the client never sees or chooses the amount, so
    * it cannot be influenced, and the player sees natural variation instead of
@@ -231,17 +231,17 @@ export class Economy {
    * than a random-looking 182,337.
    *
    * @param {object} config
-   * @returns {number} whole wool
+   * @returns {number} whole balance
    */
   #rollYield(config) {
-    const min = Number(config.woolPerShiftMin);
-    const max = Number(config.woolPerShiftMax);
+    const min = Number(config.yieldPerRunMin);
+    const max = Number(config.yieldPerRunMax);
 
     // No range configured: honour the legacy fixed value.
     // min === max is a legitimate fixed range (useful for tests and for admins
     // who want a constant payout), so it must NOT fall through.
     if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
-      return Math.max(0, Math.floor(Number(config.woolPerShift) || 0));
+      return Math.max(0, Math.floor(Number(config.yieldPerRun) || 0));
     }
 
     const span = max - min;
@@ -253,22 +253,22 @@ export class Economy {
   }
 
   /**
-   * Credit the referrer `refPercent` of the wool the referee just harvested.
+   * Credit the referrer `refPercent` of the balance the referee just harvested.
    * Returns null when the player has no referrer.
    *
    * Guards:
    *  - self-referral never pays (also blocked at registration)
    *  - a banned or missing referrer is skipped, not an error: the referee's
    *    harvest must succeed regardless
-   *  - the amount is floored, so rounding can never mint fractional wool
+   *  - the amount is floored, so rounding can never mint fractional balance
    */
-  async #payReferral(referee, creditedWool, config) {
+  async #payReferral(referee, creditedBalance, config) {
     const referrerId = referee.referredBy;
     if (!referrerId) return null;
     if (String(referrerId) === String(referee.telegramId)) return null;
 
     const percent = Number(config.refPercent ?? 0);
-    const bonus = Math.floor((creditedWool * percent) / 100);
+    const bonus = Math.floor((creditedBalance * percent) / 100);
     if (percent <= 0 || bonus <= 0) return null;
 
     const referrer = await this.store.getUser(String(referrerId));
@@ -276,8 +276,8 @@ export class Economy {
 
     // Atomic increments, not read-modify-write: two referees can harvest at the
     // same instant, and a lost update here silently underpays the referrer.
-    await this.store.increment(referrerId, 'wool', bonus);
-    await this.store.increment(referrerId, 'refEarnedWool', bonus);
+    await this.store.increment(referrerId, 'balance', bonus);
+    await this.store.increment(referrerId, 'refEarned', bonus);
     return { referrerId: String(referrerId), bonus };
   }
 
@@ -303,7 +303,7 @@ export class Economy {
     if (!Number.isInteger(value) || value <= 0) return { error: ERR.INVALID_AMOUNT };
     if (!TON_ADDRESS_RE.test(address)) return { error: ERR.INVALID_WALLET };
     if (value < config.minWithdraw) return { error: ERR.MIN_WITHDRAW, min: config.minWithdraw };
-    if (value > user.wool) return { error: ERR.INSUFFICIENT_WOOL };
+    if (value > user.balance) return { error: ERR.INSUFFICIENT_BALANCE };
 
     const now = this.now();
     const window = await this.#windowKey(now);
@@ -312,7 +312,7 @@ export class Economy {
       return { error: ERR.DAILY_LIMIT, window, maxPerDay: config.maxWithdrawsPerDay };
     }
 
-    user.wool -= value; // held immediately so the balance cannot be double-spent
+    user.balance -= value; // held immediately so the balance cannot be double-spent
     user.lastWithdrawTime = now;
     user.tonWallet = address;
     const entry = {
@@ -326,7 +326,7 @@ export class Economy {
     };
     user.withdrawHistory.push(entry);
     await this.#save(user);
-    return { ok: true, withdrawal: entry, wool: user.wool };
+    return { ok: true, withdrawal: entry, balance: user.balance };
   }
 }
 

@@ -11,7 +11,7 @@ function make(config = {}) {
 /** Start a shift and read back what it will pay. */
 async function rollOnce(eco, id) {
   const res = await eco.harvest(id);
-  return res.pendingWool;
+  return res.pendingYield;
 }
 
 test('a shift pays a value inside the configured range', async () => {
@@ -19,8 +19,8 @@ test('a shift pays a value inside the configured range', async () => {
   for (let i = 0; i < 200; i += 1) {
     const amount = await rollOnce(eco, `u${i}`);
     assert.ok(
-      amount >= DEFAULT_CONFIG.woolPerShiftMin && amount <= DEFAULT_CONFIG.woolPerShiftMax,
-      `${amount} outside ${DEFAULT_CONFIG.woolPerShiftMin}-${DEFAULT_CONFIG.woolPerShiftMax}`
+      amount >= DEFAULT_CONFIG.yieldPerRunMin && amount <= DEFAULT_CONFIG.yieldPerRunMax,
+      `${amount} outside ${DEFAULT_CONFIG.yieldPerRunMin}-${DEFAULT_CONFIG.yieldPerRunMax}`
     );
   }
 });
@@ -48,42 +48,42 @@ test('the average stays near the previous fixed payout', async () => {
   const n = 500;
   for (let i = 0; i < n; i += 1) total += await rollOnce(eco, `a${i}`);
   const average = total / n;
-  const midpoint = (DEFAULT_CONFIG.woolPerShiftMin + DEFAULT_CONFIG.woolPerShiftMax) / 2;
+  const midpoint = (DEFAULT_CONFIG.yieldPerRunMin + DEFAULT_CONFIG.yieldPerRunMax) / 2;
   assert.ok(Math.abs(average - midpoint) < 4000, `average ${average} drifted from ${midpoint}`);
 });
 
-test('a legacy fixed woolPerShift is used when the range is unusable', async () => {
+test('a legacy fixed yieldPerRun is used when the range is unusable', async () => {
   // An inverted range (max < min) is the only thing that counts as absent.
   // min === max is a legitimate fixed range and must be honoured instead.
   const economy = new Economy({
-    store: new MemoryStore({ woolPerShift: 50_000, woolPerShiftMin: 90, woolPerShiftMax: 10 }),
+    store: new MemoryStore({ yieldPerRun: 50_000, yieldPerRunMin: 90, yieldPerRunMax: 10 }),
   });
   const res = await economy.harvest('legacy');
-  assert.equal(res.pendingWool, 50_000, 'fixed value must be used when the range is unusable');
+  assert.equal(res.pendingYield, 50_000, 'fixed value must be used when the range is unusable');
 });
 
 test('min === max is a fixed range, not a missing one', async () => {
   const economy = new Economy({
-    store: new MemoryStore({ woolPerShift: 50_000, woolPerShiftMin: 10, woolPerShiftMax: 10 }),
+    store: new MemoryStore({ yieldPerRun: 50_000, yieldPerRunMin: 10, yieldPerRunMax: 10 }),
   });
   const res = await economy.harvest('fixed');
-  assert.equal(res.pendingWool, 10, 'the range must win over the legacy constant');
+  assert.equal(res.pendingYield, 10, 'the range must win over the legacy constant');
 });
 
 test('a configured range is respected exactly', async () => {
   const economy = new Economy({
-    store: new MemoryStore({ woolPerShiftMin: 1000, woolPerShiftMax: 1100 }),
+    store: new MemoryStore({ yieldPerRunMin: 1000, yieldPerRunMax: 1100 }),
   });
   for (let i = 0; i < 50; i += 1) {
     const res = await economy.harvest(`r${i}`);
-    assert.ok(res.pendingWool >= 1000 && res.pendingWool <= 1100, `got ${res.pendingWool}`);
+    assert.ok(res.pendingYield >= 1000 && res.pendingYield <= 1100, `got ${res.pendingYield}`);
   }
 });
 
 test('the amount is decided by the server, not the client', async () => {
   // harvest() takes no amount argument; the client cannot influence the payout.
   const { eco } = make();
-  const res = await eco.harvest('trust', { adToken: undefined, wool: 999_999_999 });
-  assert.ok(res.pendingWool <= DEFAULT_CONFIG.woolPerShiftMax);
-  assert.notEqual(res.pendingWool, 999_999_999);
+  const res = await eco.harvest('trust', { adToken: undefined, balance: 999_999_999 });
+  assert.ok(res.pendingYield <= DEFAULT_CONFIG.yieldPerRunMax);
+  assert.notEqual(res.pendingYield, 999_999_999);
 });

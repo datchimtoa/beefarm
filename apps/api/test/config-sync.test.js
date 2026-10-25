@@ -48,20 +48,20 @@ test('the fixture values match DEFAULT_CONFIG', async () => {
 
 test('a stored config overrides the defaults, and the rest still applies', async () => {
   // Live databases predate the yield range; the merge must keep the range.
-  const store = new MemoryStore({ woolPerShift: 182351, refPercent: 10 });
+  const store = new MemoryStore({ yieldPerRun: 182351, refPercent: 10 });
   const eco = new Economy({ store });
   const cfg = await eco.config();
 
-  assert.equal(cfg.woolPerShift, 182351, 'stored value wins');
-  assert.equal(cfg.woolPerShiftMin, DEFAULT_CONFIG.woolPerShiftMin, 'range still applies');
-  assert.equal(cfg.woolPerShiftMax, DEFAULT_CONFIG.woolPerShiftMax);
+  assert.equal(cfg.yieldPerRun, 182351, 'stored value wins');
+  assert.equal(cfg.yieldPerRunMin, DEFAULT_CONFIG.yieldPerRunMin, 'range still applies');
+  assert.equal(cfg.yieldPerRunMax, DEFAULT_CONFIG.yieldPerRunMax);
 });
 
 test('an admin can change the yield range at runtime', async () => {
   const store = new MemoryStore();
   const eco = new Economy({ store });
 
-  await store.putConfig({ woolPerShiftMin: 1000, woolPerShiftMax: 1000 });
+  await store.putConfig({ yieldPerRunMin: 1000, yieldPerRunMax: 1000 });
   const res = await eco.harvest('admin');
-  assert.equal(res.pendingWool, 1000, 'the new range takes effect without a restart');
+  assert.equal(res.pendingYield, 1000, 'the new range takes effect without a restart');
 });

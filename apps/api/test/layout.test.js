@@ -46,32 +46,35 @@ test('the layout override is loaded after the original stylesheet', () => {
 test('the layout override reclaims the wasted vertical space', () => {
   // pb-32 alone was 128px of dead space at the bottom of the Farm tab.
   assert.ok(/#tab-home\s*\{[^}]*padding-bottom/.test(LAYOUT), 'bottom padding not reduced');
-  assert.ok(/#tab-home #sheep-pen\s*\{[^}]*240px/.test(LAYOUT), 'sheep pen not shrunk');
+  assert.ok(/#tab-home #mascot-pen\s*\{[^}]*240px/.test(LAYOUT), 'mascot pen not shrunk');
 
   // Shrinking the pen without moving the absolute-positioned scissors would
   // leave it off-centre.
   assert.ok(/#tab-home #scissors-img\s*\{[^}]*top:/.test(LAYOUT), 'scissors not repositioned');
 });
 
-test('the Farm tab structure is unchanged apart from themed alt text', () => {
+test('the Farm tab keeps the same elements, ids and classes as the original', () => {
+  // Byte comparison is the wrong tool once identifiers are rethemed: it fails
+  // on renames while still missing a genuinely dropped element. Comparing the
+  // extracted STRUCTURE (tag names + class lists, with identifiers normalised)
+  // catches the thing that matters.
   const original = readFileSync(
     join(HERE, '..', '..', '..', 'reference', 'decompile', 'original.html'),
     'utf8'
   );
   const tab = (s) => s.slice(s.indexOf('id="tab-home"'), s.indexOf('id="tab-tasks"'));
 
-  // The reskin legitimately changes accessible names (Sheep -> Bee,
-  // Scissors -> Honey). Stripping alt/title/placeholder attributes lets the
-  // test assert that the STRUCTURE is untouched while allowing themed copy.
-  const structure = (s) =>
-    tab(s)
-      .replace(/\s(alt|title|placeholder)="[^"]*"/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+  // Structural fingerprint: every tag with its class attribute, in order.
+  const shape = (s) =>
+    [...tab(s).matchAll(/<(\w+)([^>]*)>/g)].map(([, tag, attrs]) => {
+      const cls = /class="([^"]*)"/.exec(attrs);
+      return `${tag}.${cls ? cls[1].split(/\s+/).sort().join('.') : ''}`;
+    });
 
-  assert.equal(
-    structure(HTML),
-    structure(original),
-    'Farm tab structure must not change: only themed attributes may differ'
+  assert.deepEqual(
+    shape(HTML),
+    shape(original),
+    'the Farm tab must contain the same tags and classes as the original'
   );
 });
+

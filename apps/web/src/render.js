@@ -2,7 +2,7 @@
 // consequence of the store rather than scattered mutations.
 import { formatNumber, toGram } from './state.js';
 import { t } from './i18n.js';
-import { spawnWoolReward, startShearEffect, stopShearEffect } from './effects.js';
+import { spawnYieldReward, startShearEffect, stopShearEffect } from './effects.js';
 import { formatCountdown, isWithdrawLocked, nextSettlement } from './clock.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,7 @@ export function toast(message, kind = 'success') {
   el.className =
     kind === 'error'
       ? 'game-card px-4 py-2 text-sm font-bold text-[#5F270A] bg-[#FFB4B4]'
-      : 'game-card px-4 py-2 text-sm font-bold text-[#5F270A] bg-[#9DFB6E]';
+      : 'game-card px-4 py-2 text-sm font-bold text-[#5F270A] bg-[#FFD659]';
   el.classList.remove('show');
   void el.offsetWidth; // restart the CSS transition
   el.classList.add('show');
@@ -120,12 +120,12 @@ export function renderState(state, now = Date.now()) {
     if (el) el.textContent = value;
   };
 
-  for (const el of document.querySelectorAll('.val-wool')) {
-    el.textContent = formatNumber(state.wool);
+  for (const el of document.querySelectorAll('.val-balance')) {
+    el.textContent = formatNumber(state.balance);
   }
-  setText('val-pendingWool', formatNumber(state.pendingWool));
+  setText('val-pendingYield', formatNumber(state.pendingYield));
   setText('val-referrals', formatNumber(state.referrals));
-  setText('val-refEarnedWool', formatNumber(state.refEarnedWool));
+  setText('val-refEarned', formatNumber(state.refEarned));
 
   renderMainAction(state, now);
   renderWithdraw(state, now);
@@ -139,8 +139,8 @@ function renderMainAction(state, now) {
   const bigTimer = $('val-big-timer');
   if (!btn) return;
 
-  const hasShift = state.pendingWool > 0;
-  const ready = hasShift && now >= state.workEndTime;
+  const hasShift = state.pendingYield > 0;
+  const ready = hasShift && now >= state.runEndTime;
 
   if (!hasShift) {
     if (bigTimer) bigTimer.textContent = t('status_waiting');
@@ -159,7 +159,7 @@ function renderMainAction(state, now) {
   } else if (ready) {
     if (bigTimer) bigTimer.textContent = t('status_ready');
     if (txt) txt.textContent = t('harvest_btn');
-    if (desc) desc.textContent = t('task_reward_wool', { amount: formatNumber(state.pendingWool) });
+    if (desc) desc.textContent = t('task_reward', { amount: formatNumber(state.pendingYield) });
     if (icon) icon.setAttribute('data-lucide', 'package-open');
     btn.disabled = false;
     btn.dataset.phase = 'harvest';
@@ -167,13 +167,13 @@ function renderMainAction(state, now) {
     $('scissors-img')?.classList.add('hidden');
     $('normal-action-cards')?.classList.remove('hidden');
   } else {
-    if (bigTimer) bigTimer.textContent = formatCountdown(state.workEndTime - now);
+    if (bigTimer) bigTimer.textContent = formatCountdown(state.runEndTime - now);
     if (txt) txt.textContent = t('status_working');
     if (desc) desc.textContent = t('status_working_desc');
     if (icon) icon.setAttribute('data-lucide', 'timer');
     btn.disabled = true;
     btn.dataset.phase = 'working';
-    startShearEffect($('wool-particles'));
+    startShearEffect($('yield-particles'));
     $('scissors-img')?.classList.remove('hidden');
     $('normal-action-cards')?.classList.remove('hidden');
   }
@@ -190,7 +190,7 @@ function renderWithdraw(state, now) {
 
   const minEl = document.querySelector('[data-key="withdraw_min"]');
   if (minEl) {
-    minEl.textContent = `* Minimum: ${formatNumber(state.minWithdraw)} Wool = ${toGram(
+    minEl.textContent = `* Minimum: ${formatNumber(state.minWithdraw)} Balance = ${toGram(
       state.minWithdraw,
       state.rateTon
     )} GRAM`;
@@ -241,7 +241,7 @@ export function renderTasks(tasks, completedTasks = []) {
           </div>
           <div>
             <p class="text-sm font-black text-[#5F270A]">Join ${task.channel}</p>
-            <p class="text-xs text-[#97BA42] font-black mt-1">+ ${formatNumber(task.reward)} Wool</p>
+            <p class="text-xs text-[#C97D00] font-black mt-1">+ ${formatNumber(task.reward)} Honey</p>
           </div>
         </div>
         ${
@@ -270,13 +270,13 @@ export function renderHistory(history = [], rateTon = 450_000_000) {
       (w) => `
       <div class="game-card p-3 flex justify-between items-center mb-2">
         <div>
-          <p class="text-sm font-black text-[#97BA42]">${(w.amount / rateTon).toFixed(8)} GRAM</p>
+          <p class="text-sm font-black text-[#C97D00]">${(w.amount / rateTon).toFixed(8)} GRAM</p>
           <p class="text-[9px] text-[#8B5A2B] font-bold truncate max-w-[180px]">${w.wallet}</p>
           <p class="text-[9px] text-[#8B5A2B] font-bold opacity-80">${new Date(w.timestamp).toLocaleString()}</p>
         </div>
         <span class="text-[10px] font-black px-2 py-1 rounded-lg border-2 ${
           w.status === 'paid'
-            ? 'bg-[#9DFB6E] text-[#5F270A] border-[#5F270A]'
+            ? 'bg-[#FFD659] text-[#5F270A] border-[#5F270A]'
             : 'bg-[#FFD659] text-[#5F270A] border-[#8B5A2B]'
         }">${w.status}</span>
       </div>`

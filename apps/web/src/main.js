@@ -20,7 +20,8 @@ import {
 import { loadLocale, t, locale } from './i18n.js';
 import { showRewardedAd } from './ads.js';
 import LANGUAGES from './languages.json';
-import { spawnWoolReward } from './effects.js';
+import * as audio from './audio.js';
+import { spawnYieldReward } from './effects.js';
 import { bindConnectionWatcher } from './connection.js';
 
 // Task list. The ids must match DEFAULT_CONFIG.tasks on the server, which is
@@ -63,6 +64,10 @@ function start({ webApp, user }) {
   bindSettings();
   bindConnectionWatcher();
 
+  // Autoplay is blocked until the player interacts, so music starts on
+  // the first tap (the original did the same with a once-only listener).
+  document.addEventListener('pointerdown', () => audio.unlock(), { once: true });
+
   applyTranslations();
   store.subscribe((state) => renderState(state));
   renderTasks(TASKS, []);
@@ -80,6 +85,7 @@ function start({ webApp, user }) {
       finishLoader();
       hideFatal();
       markReady(webApp);
+      audio.setEnabled(me.audioEnabled !== false);
       primeAdToken();
     } catch (err) {
       hideLoader();
@@ -148,10 +154,11 @@ function start({ webApp, user }) {
 
         if (phase === 'harvest') {
           const res = await api.harvest();
-          store.set({ wool: res.wool, pendingWool: 0, workEndTime: 0 });
+          store.set({ balance: res.balance, pendingYield: 0, runEndTime: 0 });
           // The original floated "+N 🐑" up from the harvest point; without it
-          // collecting wool felt like nothing had happened.
-          spawnWoolReward(el('wool-particles'), formatNumber(res.credited));
+          // collecting balance felt like nothing had happened.
+          audio.play('claim');
+          spawnYieldReward(el('yield-particles'), formatNumber(res.credited));
           toast(t('toast_collect_success', { amount: formatNumber(res.credited) }));
           primeAdToken();
           if (res.referral)
@@ -190,7 +197,7 @@ function start({ webApp, user }) {
         }
 
         const res = await api.harvest(token);
-        store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime, adToken: '' });
+        store.set({ pendingYield: res.pendingYield, runEndTime: res.runEndTime, adToken: '' });
         primeAdToken();
       })
     );
@@ -214,7 +221,7 @@ function start({ webApp, user }) {
   async function primeAdToken() {
     const state = store.get();
     if (state.adToken) return state.adToken;
-    if (state.pendingWool > 0) return ''; // a shift is running; no ad needed yet
+    if (state.pendingYield > 0) return ''; // a shift is running; no ad needed yet
     try {
       const res = await api.harvest();
       if (res.token) {
@@ -222,7 +229,7 @@ function start({ webApp, user }) {
         return res.token;
       }
       // Ads are not gated on this deployment: start the shift straight away.
-      store.set({ pendingWool: res.pendingWool, workEndTime: res.workEndTime });
+      store.set({ pendingYield: res.pendingYield, runEndTime: res.runEndTime });
     } catch (err) {
       // 402 ad_required is the EXPECTED response here, not a failure: the server
       // is telling us to show an ad and handing back a nonce. api.harvest()
@@ -295,8 +302,9 @@ function start({ webApp, user }) {
       try {
         const res = await api.claimTask(taskId);
         const state = store.get();
-        store.set({ wool: res.wool, completedTasks: [...state.completedTasks, taskId] });
+        store.set({ balance: res.balance, completedTasks: [...state.completedTasks, taskId] });
         renderTasks(TASKS, store.get().completedTasks);
+        audio.play('reward');
         toast(t('toast_reward_claimed'));
       } catch (err) {
         handleError(err);
@@ -315,9 +323,9 @@ function start({ webApp, user }) {
     });
 
     el('btn-max-withdraw')?.addEventListener('click', () => {
-      const wool = Math.floor(store.get().wool);
-      if (amountInput) amountInput.value = String(wool);
-      if (receive) receive.textContent = `${toGram(wool, store.get().rateTon)} GRAM`;
+      const balance = Math.floor(store.get().balance);
+      if (amountInput) amountInput.value = String(balance);
+      if (receive) receive.textContent = `${toGram(balance, store.get().rateTon)} GRAM`;
     });
 
     const btn = el('btn-do-withdraw');
@@ -329,7 +337,7 @@ function start({ webApp, user }) {
         const res = await api.withdraw(wallet, amount);
         const state = store.get();
         store.set({
-          wool: res.wool,
+          balance: res.balance,
           lastWithdrawTime: res.withdrawal.timestamp,
           tonWallet: wallet,
           withdrawHistory: [...state.withdrawHistory, res.withdrawal],
@@ -341,9 +349,9 @@ function start({ webApp, user }) {
   }
 
   function bindReferral() {
-    // Referral link. Must be your own bot; the sheep-era default would credit
+    // Referral link. Must be your own bot; the mascot-era default would credit
     // the original game instead. Set VITE_BOT_USERNAME at build time.
-    const bot = import.meta.env?.VITE_BOT_USERNAME ?? 'LuckyBeeFarm_bot';
+    const bot = import.meta.env?.VITE_BOT_USERNAME ?? 'honeybeefarmbot';
     const link = `https://t.me/${bot}?start=ref_${user.id}`;
     const display = el('ref-link-display');
     if (display) display.textContent = link;
@@ -376,6 +384,7 @@ function start({ webApp, user }) {
     const arrow = el('lang-dropdown-icon');
 
     const openSettings = () => {
+      audio.play('modal');
       modal?.classList.remove('hidden');
       buildLanguageList();
     };
@@ -465,7 +474,7 @@ function start({ webApp, user }) {
       if (!dot) return;
       dot.classList.toggle('translate-x-6', enabled);
       dot.classList.toggle('translate-x-0', !enabled);
-      toggle?.classList.toggle('bg-[#97BA42]', enabled);
+      toggle?.classList.toggle('bg-[#C97D00]', enabled);
       toggle?.classList.toggle('bg-[#FF6B6B]', !enabled);
     }
 
@@ -473,6 +482,8 @@ function start({ webApp, user }) {
       const next = !store.get().audioEnabled;
       store.set({ audioEnabled: next });
       paintAudio(next);
+      audio.setEnabled(next);
+      audio.play('click');
       api.setAudio?.(next).catch(() => {});
     });
 

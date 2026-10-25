@@ -47,22 +47,22 @@ test('the CSS keyframes the effects rely on exist', () => {
   // Without these the classes are inert: the elements are created but never move.
   assert.ok(CSS.includes('@keyframes floatUp'), 'floatUp keyframe missing');
   assert.ok(CSS.includes('@keyframes flyOutStrand'), 'flyOutStrand keyframe missing');
-  assert.ok(CSS.includes('.wool-particle'), '.wool-particle class missing');
+  assert.ok(CSS.includes('.wool-particle'), '.wool-particle class missing (stylesheet must stay as-shipped)');
   assert.ok(CSS.includes('.crescent-strand'), '.crescent-strand class missing');
 });
 
-test('spawnWoolReward creates the same node the original did', async () => {
+test('spawnYieldReward creates the same node the original did', async () => {
   const created = installDom();
-  const { spawnWoolReward } = await import('../../web/src/effects.js');
+  const { spawnYieldReward } = await import('../../web/src/effects.js');
   const host = makeHost();
 
-  spawnWoolReward(host, '182,351');
+  spawnYieldReward(host, '182,351');
 
   assert.equal(host.children.length, 1);
   const el = created.at(-1);
   assert.ok(el.className.includes('wool-particle'), `got "${el.className}"`);
   assert.ok(el.innerHTML.startsWith('+182,351'), `got "${el.innerHTML.slice(0, 20)}"`);
-  assert.ok(el.innerHTML.includes('/wool.png'), 'wool icon missing');
+  assert.ok(el.innerHTML.includes('/currency.png'), 'balance icon missing');
 });
 
 test('startShearEffect spawns 1-3 strands per tick, like the original', async () => {
@@ -94,6 +94,8 @@ test('startShearEffect spawns 1-3 strands per tick, like the original', async ()
 test('the original had these same two effects', () => {
   // Guards against "helpfully" reinventing them differently.
   assert.ok(ORIGINAL.includes('crescent-strand'), 'original used crescent-strand');
+  // Asserting against the original must use the ORIGINAL's identifier, not
+  // our renamed one: a blanket rename here makes the test unfalsifiable.
   assert.ok(ORIGINAL.includes('wool-particle'), 'original used wool-particle');
 });
 
@@ -109,8 +111,8 @@ test('render toggles strands and scissors with the shift phase', () => {
 });
 
 test('harvesting floats the reward text', () => {
-  assert.ok(MAIN.includes('spawnWoolReward'), 'harvest does not spawn the reward text');
-  assert.ok(MAIN.includes("el('wool-particles')"), 'reward text not attached to its host');
+  assert.ok(MAIN.includes('spawnYieldReward'), 'harvest does not spawn the reward text');
+  assert.ok(MAIN.includes("el('yield-particles')"), 'reward text not attached to its host');
 });
 
 test('the offline modal is wired to the browser events', () => {
