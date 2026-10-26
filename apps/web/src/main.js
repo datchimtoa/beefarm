@@ -26,11 +26,10 @@ import { bindConnectionWatcher } from './connection.js';
 
 // Task list. The ids must match DEFAULT_CONFIG.tasks on the server, which is
 // what actually validates a claim; the labels here are display only.
+// Display list. Ids must match DEFAULT_CONFIG.tasks on the server, which is
+// what validates a claim; labels here are presentation only.
 const TASKS = [
-  { id: 't1', channel: 'Lucky Bee Farm Channel', reward: 5_000, type: 'channel' },
-  { id: 't2', channel: 'Lucky Bee Farm Chat', reward: 5_000, type: 'chat' },
-  { id: 't3', channel: 'Bee Farm Channel', reward: 5_000, type: 'channel' },
-  { id: 't4', channel: 'Bee Farm Chat', reward: 5_000, type: 'chat' },
+  { id: 'join_channel', channel: 'Honey Bee Farm Channel', reward: 5_000, type: 'channel' },
 ];
 
 // Server error codes map onto the original's own api_* strings, so the copy a
@@ -66,7 +65,14 @@ function start({ webApp, user }) {
 
   // Autoplay is blocked until the player interacts, so music starts on
   // the first tap (the original did the same with a once-only listener).
-  document.addEventListener('pointerdown', () => audio.unlock(), { once: true });
+  // Do NOT use { once: true }. The first tap can land before the browser counts
+  // it as a valid gesture (during the loader fade, say), which would leave the
+  // game silent until the player toggled the switch off and on again — the
+  // reported bug. Retrying on every interaction is cheap and idempotent.
+  const tryUnlock = () => audio.unlock();
+  for (const evt of ['pointerdown', 'click', 'touchstart', 'keydown']) {
+    document.addEventListener(evt, tryUnlock, { passive: true });
+  }
 
   applyTranslations();
   store.subscribe((state) => renderState(state));

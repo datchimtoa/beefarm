@@ -14,33 +14,63 @@
 
 /* Reclaim the large bottom padding: the bottom nav is already outside the tab,
    so pb-32 was double-reserving space that no longer needs reserving. */
+/* !important is deliberate here and only here.
+ *
+ * These override Tailwind utilities that are baked into the markup
+ * (`pb-32`, `-mt-16`, `w-[300px]`). The CDN/JIT build injects its stylesheet
+ * into <head> AFTER this file, so an equal-specificity utility wins on cascade
+ * order no matter how many ids are in the selector. Without !important the
+ * overrides silently did nothing and the button stayed below the fold.
+ */
+
+/* pb-32 alone was 128px of dead space: the bottom nav already occupies that
+   area, so the tab was reserving it twice. */
 #tab-home {
-  padding-bottom: 0.5rem;
-  padding-top: 0.5rem;
-  row-gap: 0.5rem;
+  padding-bottom: 0.25rem !important;
+  padding-top: 0.5rem !important;
+  row-gap: 0.5rem !important;
 }
 
-/* The 300px pen is the single biggest block. Shrinking it proportionally keeps
-   the artwork centred and full-width, and pulls the button into view. */
+/* The pen is the biggest single block. 240px keeps the mascot prominent while
+   pulling the action button into view on a 844px-tall phone. */
 #tab-home #mascot-pen {
-  width: 240px;
-  height: 240px;
-  margin-top: -2rem;
+  width: 220px !important;
+  height: 220px !important;
+  margin-top: -1.5rem !important;
 }
 
-/* The scissors overlay is positioned in absolute pixels inside the pen, so it
-   has to be rescaled with it or it drifts off-centre. */
+/* The GIF overlay is positioned in absolute pixels inside the pen, so it has to
+   be rescaled with it or it drifts off-centre. */
 #tab-home #scissors-img {
-  top: 64px;
-  left: 104px;
-  width: 64px;
-  height: 64px;
+  top: 50% !important;
+  left: 50% !important;
+  /* The GIF is 240x135 (16:9). Squaring it to 80x80 letterboxed the art and
+     made it look tiny; size by width and let the height follow. */
+  width: 150px !important;
+  height: 84px !important;
+  transform: translate(-50%, -50%) !important;
+  object-fit: cover;
+  /* The GIF carries a pale matte from the source render. A circular mask
+     crops the corners so the matte reads as a soft vignette rather than a
+     white box on the hive background. */
+  border-radius: 18px;
+  mix-blend-mode: multiply;
 }
 
-/* Tighten the yield card and status block slightly; a few pixels each adds up
-   without visibly changing the design. */
+/* Tighten the yield card; a few pixels each adds up without changing the look. */
 #tab-home > .game-card {
-  padding: 0.9rem;
+  padding: 0.85rem !important;
+}
+
+/* The status block's -mb-6 pulled the pen up over it; keep that but reduce it. */
+#tab-home > div.text-center {
+  margin-bottom: -0.75rem !important;
+}
+
+/* Keep the action area reachable at the bottom of the tab, never below it. */
+#action-area {
+  min-height: auto !important;
+  padding-bottom: 0.25rem !important;
 }
 
 /* Guarantee the action row is reachable on short screens without scrolling to
@@ -64,10 +94,18 @@
   background: radial-gradient(circle at 50% 30%, #fff6d6, #f5f9c0 70%);
 }
 
-/* Logo: gentle float, no hard bounce. */
+/* Logo: gentle float, no hard bounce.
+ *
+ * The base stylesheet draws a 4px #5F270A border plus a soft 6px outer ring,
+ * which framed the circular logo in a visible box and read as a stray border.
+ * Removing both and falling back to a diffuse amber glow lets the artwork sit
+ * on the honey background without an outline. */
 #initial-loader .loader-logo {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   animation: beeFloat 2.2s ease-in-out infinite alternate;
-  box-shadow: 0 6px #5f270a, 0 0 0 6px rgba(255, 214, 89, 0.35);
+  filter: drop-shadow(0 10px 18px rgba(139, 90, 43, 0.35));
 }
 
 @keyframes beeFloat {
@@ -141,4 +179,47 @@
   display: block;
   border-radius: 50%;
   transform: scale(1.06);      /* trims the ~20px white band to the gold ring */
+}
+
+/* ------------------------------------------------------------------ *
+ * Replace the sheep-wool strands with honey droplets
+ *
+ * The original `crescent-strand` was a 24x12 white crescent drawn with
+ * `border: 3px solid #fff` — unmistakably fleece, and wrong during honey
+ * collection. The stylesheet itself must stay byte-identical to the original,
+ * so the shape is overridden here instead.
+ *
+ * A droplet is just that border with two corners rounded to half the height;
+ * tinting it amber and shrinking it reads as honey without new artwork.
+ * ------------------------------------------------------------------ */
+
+#yield-particles .crescent-strand {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #f4b400;
+  border-top: none;
+  border-left: none;
+  border-radius: 0 0 50% 50%;
+  filter: drop-shadow(0 1px 1px rgba(139, 90, 43, 0.45));
+  transform: rotate(45deg);
+}
+
+/* A second, lighter tone so the stream of droplets is not monotone. */
+#yield-particles .crescent-strand:nth-child(odd) {
+  border-color: #ffd659;
+}
+
+/* Language dropdown was still the grass green of the sheep skin. */
+.custom-dropdown-list {
+  background-color: #ffe8a1;
+}
+
+.custom-dropdown-item:hover,
+.custom-dropdown-item.selected {
+  background-color: rgba(255, 214, 89, 0.55);
+}
+
+/* Success state for the retry button on the fatal-error panel. */
+#fatal-error button {
+  background: #ffd659;
 }

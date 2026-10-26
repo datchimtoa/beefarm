@@ -23,11 +23,13 @@ export const DEFAULT_CONFIG = {
   rateTon: 450_000_000,           // balance per GRAM
   settlementHourUtc: 8,           // daily payout tick (UTC)
   maxWithdrawsPerDay: 1,          // admin-controlled
+  // Task list. Ids are referenced by the client and stored in each player's
+  // completedTasks, so never reuse an id for a different channel.
+  // The sheep-era entries (including two @HappyCowFarm channels inherited from
+  // the template this game was built from) were removed. More tasks can be
+  // added here, or through system_config.tasks, without touching the client.
   tasks: [
-    { id: 't1', reward: 5_000, channel: '@LuckyMascotFarm_channel' },
-    { id: 't2', reward: 5_000, channel: '@LuckyMascotFarm_chat' },
-    { id: 't3', reward: 5_000, channel: '@HappyCowFarm_channel' },
-    { id: 't4', reward: 5_000, channel: '@HappyCowFarm_chat' },
+    { id: 'join_channel', reward: 5_000, channel: '@HoneyBeeFarmChannel' },
   ],
 };
 
@@ -203,20 +205,44 @@ export class Economy {
   /**
    * Record a referral and pay the referrer a cut of the referee's production.
    * Idempotent per (referrer, referee) pair via `user.referredBy`.
+   *
+   * A referral only counts once the referee has actually joined the required
+   * channel. The original credited on deep-link click alone, so anyone could
+   * open `?startapp=<id>` in a browser / from an alt account and mint referral
+   * income without ever joining anything. `isMember` is the same probe the task
+   * claim uses; when it is not supplied (unit tests, local dev) the check is
+   * skipped rather than failing open silently in production — the app always
+   * passes it.
+   *
+   * @param {string} telegramId  the referee
+   * @param {string} referrerId  from the signed `start_param`
+   * @param {(channel: string) => Promise<boolean>} [isMember]
    */
-  async registerReferral(telegramId, referrerId) {
+  async registerReferral(telegramId, referrerId, isMember) {
     if (!referrerId || String(referrerId) === String(telegramId)) return { ok: false, ignored: 'self' };
     const referee = await this.user(telegramId);
     if (referee.referredBy) return { ok: false, ignored: 'already_referred' };
     const referrer = await this.store.getUser(String(referrerId));
     if (!referrer) return { ok: false, ignored: 'unknown_referrer' };
+    if (referrer.banned) return { ok: false, ignored: 'banned_referrer' };
+
+    // Membership gate. Until the referee has joined, nothing is recorded, so the
+    // deep link can be retried later and will succeed once they do.
+    if (typeof isMember === 'function') {
+      const config = await this.config();
+      const required = config.referralChannel ?? config.tasks?.[0]?.channel;
+      if (required) {
+        const member = await isMember(required);
+        if (!member) return { ok: false, ignored: 'not_member', channel: required };
+      }
+    }
 
     referee.referredBy = String(referrerId);
     await this.#save(referee);
 
-    referrer.referrals += 1;
-    await this.#save(referrer);
-    return { ok: true };
+    // Atomic: concurrent sign-ups would otherwise lose increments.
+    await this.store.increment(String(referrerId), 'referrals', 1);
+    return { ok: true, referrerId: String(referrerId) };
   }
 
 

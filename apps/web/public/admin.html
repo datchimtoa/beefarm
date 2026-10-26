@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Honey Bee Farm — Admin</title>
+<link rel="stylesheet" href="/assets/fonts/nunito.css">
+<style>
+  /* Deliberately standalone: the admin page must not load the game bundle, its
+     audio, or its store. It only needs the /api/admin/* endpoints. */
+  :root {
+    --honey: #ffd659;
+    --amber: #f4b400;
+    --deep: #5f270a;
+    --brown: #8b5a2b;
+    --cream: #fffbe6;
+    --danger: #e63946;
+    --ok: #2e7d32;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Nunito, system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #fff6d6, #f5e9c0 70%);
+    color: var(--deep);
+    min-height: 100vh;
+    padding: 16px;
+  }
+  header { display: flex; align-items: center; gap: 12px; max-width: 960px; margin: 0 auto 20px; }
+  header img { width: 40px; height: 40px; border-radius: 50%; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .5px; text-transform: uppercase; }
+  main { max-width: 960px; margin: 0 auto; }
+
+  .card {
+    background: var(--cream);
+    border: 2px solid var(--brown);
+    border-radius: 16px;
+    box-shadow: 0 4px var(--brown);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+    margin: 0 0 12px; color: var(--brown);
+  }
+  label { display: block; font-size: 12px; font-weight: 800; margin-bottom: 4px; }
+  input, select {
+    width: 100%; padding: 10px 12px; font: inherit; font-weight: 700;
+    border: 2px solid var(--brown); border-radius: 10px;
+    background: #fff; color: var(--deep); margin-bottom: 12px;
+  }
+  input:focus, select:focus { outline: 3px solid rgba(255, 214, 89, .8); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0 12px; }
+  button {
+    font: inherit; font-weight: 900; text-transform: uppercase; letter-spacing: .5px;
+    padding: 10px 18px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--deep); background: linear-gradient(180deg, var(--honey), var(--amber));
+    color: #fff; text-shadow: 0 1px 2px rgba(95, 39, 10, .5);
+    box-shadow: 0 4px var(--deep); transition: transform .08s, box-shadow .08s;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px var(--deep); }
+  button[disabled] { opacity: .55; cursor: not-allowed; }
+  button.secondary { background: #fff; color: var(--deep); text-shadow: none; }
+  button.danger { background: linear-gradient(180deg, #ff7b7b, var(--danger)); }
+
+  .hint { font-size: 11px; color: var(--brown); margin: -8px 0 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+
+  #status { min-height: 22px; font-size: 13px; font-weight: 800; margin-bottom: 12px; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--danger); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid rgba(139, 90, 43, .25); }
+  th { font-size: 11px; text-transform: uppercase; color: var(--brown); }
+  td input { margin: 0; padding: 6px 8px; font-size: 13px; }
+  .task-row button { padding: 6px 10px; font-size: 11px; }
+
+  .chip {
+    display: inline-block; font-size: 10px; font-weight: 900; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 999px; margin-left: 6px;
+    background: var(--honey); color: var(--deep);
+  }
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <img src="/logo.png" alt="">
+  <h1>Honey Bee Farm · Admin</h1>
+</header>
+
+<main>
+  <!-- Auth ----------------------------------------------------------------->
+  <section class="card" id="login-card">
+    <h2>Sign in</h2>
+    <label for="token">Admin token</label>
+    <input id="token" type="password" autocomplete="current-password" placeholder="ADMIN_TOKEN">
+    <p class="hint">Sent as the <code>x-admin-token</code> header. Stored in this tab only.</p>
+    <button id="login">Unlock</button>
+  </section>
+
+  <div id="panel" class="hidden">
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <!-- Economy settings ------------------------------------------------->
+    <section class="card">
+      <h2>Economy</h2>
+      <div class="grid">
+        <div>
+          <label for="yieldPerRunMin">Yield per run — min</label>
+          <input id="yieldPerRunMin" type="number" min="0" step="100">
+        </div>
+        <div>
+          <label for="yieldPerRunMax">Yield per run — max</label>
+          <input id="yieldPerRunMax" type="number" min="0" step="100">
+        </div>
+        <div>
+          <label for="refPercent">Referral share (%)</label>
+          <input id="refPercent" type="number" min="0" max="100" step="1">
+        </div>
+        <div>
+          <label for="minWithdraw">Minimum withdrawal</label>
+          <input id="minWithdraw" type="number" min="1" step="100000">
+        </div>
+        <div>
+          <label for="rateTon">Honey per GRAM</label>
+          <input id="rateTon" type="number" min="1" step="1000000">
+        </div>
+        <div>
+          <label for="maxWithdrawsPerDay">Withdrawals / day</label>
+          <input id="maxWithdrawsPerDay" type="number" min="0" max="100" step="1">
+        </div>
+        <div>
+          <label for="settlementHourUtc">Settlement hour (UTC)</label>
+          <input id="settlementHourUtc" type="number" min="0" max="23" step="1">
+        </div>
+      </div>
+      <div class="row">
+        <button id="save-settings">Save settings</button>
+      </div>
+    </section>
+
+    <!-- Tasks ------------------------------------------------------------>
+    <section class="card">
+      <h2>Tasks <span class="chip" id="task-count"></span></h2>
+      <p class="hint">
+        A player claims each task once. The id is permanent: never reuse an id for a
+        different channel, or past claimants inherit a reward they did not earn.
+      </p>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Channel</th><th>Reward</th><th></th></tr>
+        </thead>
+        <tbody id="task-rows"></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <button id="add-task" class="secondary">+ Add task</button>
+        <button id="save-tasks">Save tasks</button>
+      </div>
+    </section>
+
+    <!-- Players ---------------------------------------------------------->
+    <section class="card">
+      <h2>Player</h2>
+      <div class="grid">
+        <div>
+          <label for="player-id">Telegram ID</label>
+          <input id="player-id" type="text" inputmode="numeric" placeholder="123456789">
+        </div>
+        <div>
+          <label for="grant">Amount (negative to debit)</label>
+          <input id="grant" type="number" step="1000" placeholder="100000">
+        </div>
+      </div>
+      <div class="row">
+        <button id="do-grant">Apply balance change</button>
+        <button id="do-ban" class="danger">Ban</button>
+        <button id="do-unban" class="secondary">Unban</button>
+      </div>
+    </section>
+
+    <!-- Withdrawals ------------------------------------------------------>
+    <section class="card">
+      <h2>Withdrawal queue</h2>
+      <p class="hint">Requests awaiting manual settlement, newest first.</p>
+      <button id="load-withdrawals" class="secondary">Refresh</button>
+      <table style="margin-top:12px">
+        <thead>
+          <tr><th>When</th><th>Player</th><th>Honey</th><th>GRAM</th><th>Wallet</th></tr>
+        </thead>
+        <tbody id="withdrawal-rows">
+          <tr><td colspan="5" class="hint">Not loaded.</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</main>
+</body>
+</html>

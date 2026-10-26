@@ -46,16 +46,28 @@ function ensure() {
 function playBgm() {
   if (!enabled) return;
   ensure();
-  bgm.play().catch(() => {
-    // Rejected because the page has not been interacted with yet; unlock()
-    // retries on the first tap.
-  });
+  const p = bgm.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch((err) => {
+      // Autoplay was blocked. Not an error worth surfacing: the next real tap
+      // calls unlock() again, which retries. Logged so it is diagnosable.
+      console.info('[audio] playback blocked:', err?.name ?? err);
+    });
+  }
 }
 
 /** Start music on the first user gesture. Safe to call repeatedly. */
 export function unlock() {
   unlocked = true;
   if (enabled) playBgm();
+}
+
+/**
+ * True when music is actually audible. Used by tests and by the settings UI to
+ * explain why a switch may look on but be silent.
+ */
+export function isPlaying() {
+  return Boolean(bgm) && !bgm.paused && !bgm.ended;
 }
 
 /** Apply the saved preference and begin playing if allowed. */

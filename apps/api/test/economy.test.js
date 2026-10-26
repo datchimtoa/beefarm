@@ -45,14 +45,19 @@ test('a shift cannot be double-credited', async () => {
 
 test('task reward is paid once and requires membership', async () => {
   const { eco } = makeEconomy();
-  const denied = await eco.claimTask('42', 't1', neverMember);
+  // Resolve the id from config rather than hard-coding it: the task list is
+  // data, and a rebuilt list should not break this test.
+  const { tasks } = await eco.config();
+  const taskId = tasks[0].id;
+
+  const denied = await eco.claimTask('42', taskId, neverMember);
   assert.equal(denied.error, ERR.NOT_MEMBER);
 
-  const ok = await eco.claimTask('42', 't1', alwaysMember);
+  const ok = await eco.claimTask('42', taskId, alwaysMember);
   assert.equal(ok.ok, true);
   assert.equal(ok.balance, 5_000);
 
-  const dup = await eco.claimTask('42', 't1', alwaysMember);
+  const dup = await eco.claimTask('42', taskId, alwaysMember);
   assert.equal(dup.error, ERR.ALREADY_CLAIMED);
 
   const unknown = await eco.claimTask('42', 'nope', alwaysMember);

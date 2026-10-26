@@ -84,7 +84,12 @@ export function verifyInitData(initData, botToken, opts = {}) {
     return { ok: false, reason: 'no_user' };
   }
 
-  return { ok: true, user, authDate };
+  // `start_param` carries the deep-link payload (`t.me/bot?startapp=<value>`).
+  // It is inside the signed blob, so it cannot be forged: a player cannot claim
+  // to have been referred by someone they were not actually referred by.
+  const startParam = params.get('start_param') || null;
+
+  return { ok: true, user, authDate, startParam };
 }
 
 /**

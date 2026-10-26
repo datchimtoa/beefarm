@@ -104,4 +104,26 @@ export class FirebaseStore {
     const db = await this.#database();
     await db.ref('system_config').update(patch);
   }
+
+  /**
+   * Flattened view of every player's pending withdrawals.
+   *
+   * Withdrawals live inside each user record, so this is a projection over
+   * `users` rather than a dedicated collection. The query is unindexed and
+   * linear, which is fine at the scale this game runs at; if `users` ever grows
+   * past a few thousand, add an index or a mirror collection.
+   */
+  async listWithdrawals() {
+    const db = await this.#database();
+    const snap = await db.ref('users').get();
+    if (!snap.exists()) return [];
+
+    const out = [];
+    for (const [telegramId, user] of Object.entries(snap.val() ?? {})) {
+      for (const w of user?.withdrawHistory ?? []) {
+        if (w?.status === 'pending') out.push({ ...w, telegramId });
+      }
+    }
+    return out;
+  }
 }

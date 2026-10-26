@@ -156,3 +156,69 @@ test('REGRESSION: concurrent harvests do not lose referral payouts', async () =>
   assert.equal(referrer.balance, expected, 'no lost updates');
   assert.equal(referrer.refEarned, expected);
 });
+
+// ---------------------------------------------------------------------------
+// Membership gate
+//
+// A referral must not be credited on the deep-link click alone. The original
+// credited unconditionally, so opening `?startapp=<id>` from an alt account (or
+// a browser, with no channel join at all) minted referral income.
+// ---------------------------------------------------------------------------
+
+test('a referral is not recorded until the referee joins the channel', async () => {
+  const { eco, store } = make();
+  await store.putUser(emptyUser('1', 0));
+  await store.putUser(emptyUser('2', 0));
+
+  const denied = await eco.registerReferral('2', '1', async () => false);
+  assert.equal(denied.ok, false);
+  assert.equal(denied.ignored, 'not_member');
+
+  // Nothing was written, so the link can be retried after joining.
+  assert.equal((await eco.user('2')).referredBy, undefined);
+  assert.equal((await store.getUser('1')).referrals, 0);
+
+  const allowed = await eco.registerReferral('2', '1', async () => true);
+  assert.equal(allowed.ok, true);
+  assert.equal((await eco.user('2')).referredBy, '1');
+  assert.equal((await store.getUser('1')).referrals, 1);
+});
+
+test('the membership probe is given the configured channel', async () => {
+  const { eco, store } = make();
+  await store.putUser(emptyUser('1', 0));
+  await store.putUser(emptyUser('2', 0));
+
+  const seen = [];
+  await eco.registerReferral('2', '1', async (channel) => {
+    seen.push(channel);
+    return true;
+  });
+
+  assert.deepEqual(seen, ['@HoneyBeeFarmChannel']);
+});
+
+test('a banned referrer earns nothing and the referral is not recorded', async () => {
+  const { eco, store } = make();
+  await store.putUser({ ...emptyUser('1', 0), banned: true });
+  await store.putUser(emptyUser('2', 0));
+
+  const res = await eco.registerReferral('2', '1', async () => true);
+  assert.equal(res.ok, false);
+  assert.equal(res.ignored, 'banned_referrer');
+  assert.equal((await eco.user('2')).referredBy, undefined);
+});
+
+test('self-referral is refused before any membership check runs', async () => {
+  const { eco, store } = make();
+  await store.putUser(emptyUser('1', 0));
+
+  let probed = false;
+  const res = await eco.registerReferral('1', '1', async () => {
+    probed = true;
+    return true;
+  });
+
+  assert.equal(res.ignored, 'self');
+  assert.equal(probed, false, 'no need to hit Telegram for a self-referral');
+});

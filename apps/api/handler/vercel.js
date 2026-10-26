@@ -11,6 +11,7 @@ import { Economy } from '../lib/economy.js';
 import { FirebaseStore } from '../lib/store-firebase.js';
 import { MemoryStore } from '../lib/store-memory.js';
 import { AdVerifier } from '../lib/ads.js';
+import { AdminService } from '../lib/admin.js';
 
 let app;
 
@@ -71,12 +72,49 @@ function getApp() {
 
   const economy = new Economy({ store, ads });
 
+  // Real membership check, replacing the ALLOW_TASK_CLAIMS placeholder.
+  //
+  // The placeholder returned true for everyone once enabled, so "join the
+  // channel" was decorative: any player could claim the reward without ever
+  // joining, and a referral could be credited without a join too. Telegram's
+  // getChatMember is the only trustworthy source.
+  //
+  // Failure is treated as "not a member". A Telegram outage should briefly
+  // block claiming, never silently hand out rewards.
+  const isMember = async (channel, userId) => {
+    if (!botToken) return false;
+    const chat = String(channel ?? '').trim();
+    const id = String(userId ?? '').trim();
+    if (!chat || !id) return false;
+    try {
+      const target = chat.startsWith('@') ? chat : `@${chat}`;
+      const resp = await fetch(
+        `https://api.telegram.org/bot${botToken}/getChatMember` +
+          `?chat_id=${encodeURIComponent(target)}&user_id=${encodeURIComponent(id)}`,
+        { signal: AbortSignal.timeout(4000) },
+      );
+      if (!resp.ok) return false;
+      const body = await resp.json();
+      if (!body.ok) return false;
+      const status = body.result?.status;
+      // 'left' and 'kicked' are the only states that mean "not in the channel".
+      return status === 'creator' || status === 'administrator' || status === 'member';
+    } catch (err) {
+      console.warn('[vercel] getChatMember failed:', err?.message ?? err);
+      return false;
+    }
+  };
+
+  const adminToken = process.env.ADMIN_TOKEN ?? '';
+  if (!adminToken) console.warn('[vercel] ADMIN_TOKEN missing: admin API disabled');
+
   app = createApp({
     economy,
     botToken: botToken ?? '',
     ads,
-    // Placeholder: replace with a real getChatMember call before launch.
-    isMember: async () => process.env.ALLOW_TASK_CLAIMS === '1',
+    isMember,
+    admin: adminToken ? new AdminService({ store, economy }) : null,
+    adminToken,
   });
   return app;
 }

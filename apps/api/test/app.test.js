@@ -85,7 +85,7 @@ test('full loop: shift -> harvest -> task -> me', async (t) => {
   assert.equal(done.body.phase, 'harvest');
   assertPlausibleYield(assert, done.body.balance, 'credited balance');
 
-  const task = await post(base, '/api/claim_task', { initData, body: { taskId: 't1' } });
+  const task = await post(base, '/api/claim_task', { initData, body: { taskId: 'join_channel' } });
   assert.equal(task.status, 200);
   assert.equal(task.body.balance, done.body.balance + 5000);
 
@@ -119,7 +119,9 @@ test('task claim requires membership', async (t) => {
   t.after(() => server.close());
   const initData = signInitData(USER, BOT);
 
-  const r = await post(base, '/api/claim_task', { initData, body: { taskId: 't2' } });
+  // Any task in the configured list will do; 't2' no longer exists after the
+  // sheep-era tasks were removed.
+  const r = await post(base, '/api/claim_task', { initData, body: { taskId: 'join_channel' } });
   assert.equal(r.status, 403);
   assert.equal(r.body.errorCode, 'not_member');
 });

@@ -33,6 +33,21 @@ export class MemoryStore {
   }
 
 
+  // -- withdrawals --------------------------------------------------
+  // Flattened view of every player's pending requests. Withdrawals live inside
+  // each user record (that is how the game writes them), so an operator needs a
+  // projection rather than a dedicated collection.
+
+  async listWithdrawals() {
+    const out = [];
+    for (const [telegramId, user] of this.users) {
+      for (const w of user.withdrawHistory ?? []) {
+        if (w.status === 'pending') out.push({ ...structuredClone(w), telegramId });
+      }
+    }
+    return out;
+  }
+
   // -- ad tokens ---------------------------------------------------
   // Kept in the store rather than in process memory so that a postback can be
   // handled by a different instance than the one that issued the token. On

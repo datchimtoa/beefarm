@@ -4,6 +4,7 @@
 // Auth: every /api call must carry `x-init-data`; we verify the Telegram HMAC
 // and derive the user id from the *verified* payload. The client never tells us
 // who it is.
+import crypto from 'node:crypto';
 import { verifyInitData } from './lib/telegram.js';
 import { Economy, ERR } from './lib/economy.js';
 
@@ -22,6 +23,84 @@ const STATUS = {
   [ERR.MIN_WITHDRAW]: 400,
   [ERR.AD_REQUIRED]: 402,
 };
+/**
+ * Constant-time string comparison.
+ *
+ * Comparing admin tokens with `===` leaks the length and prefix through timing.
+ * Over the public internet that is not a practical attack, but the fix is three
+ * lines and this is the one credential in the system that can rewrite payouts.
+ */
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a ?? ''));
+  const bb = Buffer.from(String(b ?? ''));
+  // timingSafeEqual throws on length mismatch, which would itself leak length.
+  if (ab.length !== bb.length) {
+    crypto.timingSafeEqual(ab, ab);
+    return false;
+  }
+  return crypto.timingSafeEqual(ab, bb);
+}
+
+/**
+ * Admin API. Authenticated with a shared secret, not Telegram initData: the
+ * operator is an admin, not a player, and may not even be using the Mini App.
+ *
+ * @param {{req: object, res: object, route: string, url: URL, admin: object|null, adminToken: string}} ctx
+ */
+async function handleAdmin({ req, res, route, url, admin, adminToken }) {
+  // Refuse everything when admin is not configured, rather than defaulting open.
+  if (!admin) return json(res, 503, { success: false, reason: 'admin_not_configured' });
+
+  const supplied = req.headers['x-admin-token'] ?? url.searchParams.get('token') ?? '';
+  if (!adminToken || !safeEqual(supplied, adminToken)) {
+    return json(res, 401, { success: false, reason: 'unauthorized' });
+  }
+
+  try {
+    if (req.method === 'GET' && route === '/api/admin/config') {
+      return json(res, 200, { success: true, ...(await admin.getConfig()) });
+    }
+
+    if (req.method === 'POST' && route === '/api/admin/config') {
+      const body = await readBody(req);
+      const result = await admin.updateConfig(body.settings ?? body);
+      return json(res, 200, { success: true, ...result });
+    }
+
+    if (req.method === 'POST' && route === '/api/admin/tasks') {
+      const body = await readBody(req);
+      const result = await admin.setTasks(body.tasks ?? []);
+      return json(res, 200, { success: true, ...result });
+    }
+
+    if (req.method === 'POST' && route === '/api/admin/grant') {
+      const { telegramId, amount } = await readBody(req);
+      return json(res, 200, { success: true, ...(await admin.grantBalance(telegramId, amount)) });
+    }
+
+    if (req.method === 'POST' && route === '/api/admin/ban') {
+      const { telegramId, banned } = await readBody(req);
+      return json(res, 200, { success: true, ...(await admin.setBanned(telegramId, banned)) });
+    }
+
+    if (req.method === 'GET' && route === '/api/admin/withdrawals') {
+      const limit = Number(url.searchParams.get('limit') ?? 100);
+      return json(res, 200, { success: true, ...(await admin.listWithdrawals({ limit })) });
+    }
+
+    return json(res, 404, { success: false, reason: 'unknown_admin_route' });
+  } catch (err) {
+    // Validation failures are the operator's fault: report them precisely so the
+    // panel can highlight the offending field.
+    if (err?.name === 'AdminError') {
+      return json(res, 400, { success: false, reason: err.reason, ...(err.detail ?? {}) });
+    }
+    console.error('[admin] unexpected:', err);
+    return json(res, 500, { success: false, reason: 'internal_error' });
+  }
+}
+
+
 
 function json(res, status, payload) {
   const body = JSON.stringify(payload);
@@ -63,7 +142,7 @@ async function readBody(req, limit = 8 * 1024) {
  * @param {string} deps.botToken
  * @param {(channel: string, userId: string) => Promise<boolean>} deps.isMember
  */
-export function createApp({ economy, botToken, isMember, ads = null }) {
+export function createApp({ economy, botToken, isMember, ads = null, admin = null, adminToken = '' }) {
   return async function handler(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const route = url.pathname;
@@ -134,6 +213,13 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
       return json(res, 404, { success: false, errorCode: ERR.NOT_FOUND });
     }
 
+    // Admin routes authenticate with their own shared secret, so they must be
+    // handled BEFORE the player initData gate below. Leaving them after it meant
+    // every admin call also needed a valid Telegram player session.
+    if (route.startsWith('/api/admin/')) {
+      return handleAdmin({ req, res, route, url, admin, adminToken });
+    }
+
     const auth = verifyInitData(req.headers['x-init-data'], botToken);
     if (!auth.ok) {
       // 401 intentionally: the client treats it as a hard auth failure.
@@ -169,7 +255,24 @@ export function createApp({ economy, botToken, isMember, ads = null }) {
       }
 
       if (req.method === 'POST' && route === '/api/invite') {
-        return json(res, 200, { success: true, id: userId });
+        // Register the referral from the signed start_param, if there is one.
+        //
+        // This used to return early without ever calling registerReferral, so
+        // referrals were dead code: no referee was ever recorded and no
+        // referrer ever earned a share. Idempotent — the second and later calls
+        // return `already_referred` and change nothing.
+        const startParam = String(auth.startParam ?? '').trim();
+        let referral = null;
+        if (startParam) {
+          // startapp payloads are frequently "ref_<id>"; accept either form.
+          const referrerId = startParam.replace(/^ref_/, '');
+          if (/^\d+$/.test(referrerId)) {
+            referral = await economy.registerReferral(userId, referrerId, (channel) =>
+              isMember(channel, userId),
+            );
+          }
+        }
+        return json(res, 200, { success: true, id: userId, referral });
       }
 
       // Poll after showing an ad.
